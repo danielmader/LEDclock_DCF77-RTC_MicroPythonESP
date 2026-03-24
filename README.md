@@ -1,1 +1,1 @@
-# SegmentClockDCF77_MicroPythonESP
+# RTC-DCF77-LED-Clock_MicroPythonESP
