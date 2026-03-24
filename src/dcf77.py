@@ -140,12 +140,12 @@ class DCF77():
 
 if __name__ == "__main__":
     from machine import Pin,SoftI2C
-    from ds3231 import DS3231
+    # from ds3231 import DS3231
     from machine import Pin,SoftI2C
-    i2c=SoftI2C(scl=Pin(22),sda=Pin(23),freq=100000)
-    rtc=DS3231(i2c)
-    dc=DCF77()
+    # i2c=SoftI2C(scl=Pin(22),sda=Pin(23),freq=100000)
+    # rtc=DS3231(i2c)
+    dc=DCF77(dcf=16)
     dt=dc.synchronize()
-    rtc.DateTime(dt)
+    # rtc.DateTime(dt)
 
 # array('B', [0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0])
