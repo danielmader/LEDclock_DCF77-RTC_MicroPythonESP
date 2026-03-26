@@ -8,7 +8,7 @@ from sys import exit
 class DCF77():
 
     def __init__(self,dcf=18,sec=4,wait=19):
-        self.seconds =array("B",0 for _ in range(60))
+        self.seconds =array("B", (0 for _ in range(60)))
         self.start = 0
         self.ende = 0
         self.delay = 0
@@ -44,7 +44,7 @@ class DCF77():
             self.dcf.irq(handler = self.stopwatch, trigger=Pin.IRQ_RISING)
             self.triggered=True
             self.secLed.off()
- 
+
     def wait(self,pin):
         self.start=ticks_us()
         self.triggered=True
@@ -68,7 +68,7 @@ class DCF77():
                 if self.dcf.value()==0:
                     self.blink(20,1,self.waitLed)
                 self.dcf.irq(handler = self.wait, trigger=Pin.IRQ_FALLING)
-    
+
     def checkParity(self):
         minuten=0
         for i in range(21,29):
@@ -83,9 +83,9 @@ class DCF77():
             datum += self.seconds[i]
             datum %= 2
         return (minuten,stunden,datum)
-    
+
     def calcDateTime(self):
-        def bcd2dec(c,n,cc,m): 
+        def bcd2dec(c,n,cc,m):
             x,xx=0,0
             for i in range(n):
                 x += self.seconds[c+i]*(2**i)
@@ -93,7 +93,7 @@ class DCF77():
                 xx += self.seconds[cc+i]*(2**i)
             x=x+xx*10
             return x
-        
+
         m=bcd2dec(21,4,25,3)
         h=bcd2dec(29,4,33,2)
         d=bcd2dec(36,4,40,2)
@@ -136,16 +136,16 @@ class DCF77():
                     self.dcf.irq(handler = None)
                     sleep(2)
                     self.waitForStart()
-                    
+
 
 if __name__ == "__main__":
     from machine import Pin,SoftI2C
-    # from ds3231 import DS3231
+    from ds3231 import DS3231
     from machine import Pin,SoftI2C
-    # i2c=SoftI2C(scl=Pin(22),sda=Pin(23),freq=100000)
-    # rtc=DS3231(i2c)
-    dc=DCF77(dcf=16)
+    i2c=SoftI2C(scl=Pin(22),sda=Pin(23),freq=100000)
+    rtc=DS3231(i2c)
+    dc=DCF77()
     dt=dc.synchronize()
-    # rtc.DateTime(dt)
+    rtc.DateTime(dt)
 
 # array('B', [0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0])
