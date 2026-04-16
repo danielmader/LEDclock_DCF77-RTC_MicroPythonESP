@@ -2,47 +2,121 @@ import asyncio
 import machine
 import time
 
-# Hardware Setup
-# RTC initialisieren (interne Uhr des ESP32)
-rtc = machine.RTC()
+
+## --- Hardware Setup -----------------------------------------------------------
+## Interne RTC des ESP32
+rtc_internal = machine.RTC()
+
+## I2C für RV-8263 und SHT31 (Pins wie besprochen)
+i2c = machine.I2C(0, scl=machine.Pin(22), sda=machine.Pin(23))
+
+## Analog-Pin für TEMT6000
+light_sensor = machine.ADC(machine.Pin(34))
+light_sensor.atten(machine.ADC.ATTN_11DB)
+
+
+## --- Hilfsfunktionen für die Hardware -----------------------------------------
+
+def get_external_rtc_time():
+    """Liest die Zeit aus der RV-8263 (Register 0x04)"""
+    ## Hier kommt deine BCD-Logik rein
+    ## Rückgabe: (Jahr, Monat, Tag, Wochentag, Stunde, Minute, Sekunde)
+    return (2026, 4, 16, 3, 15, 30, 0)
+
+
+def get_sensors():
+    """Liest SHT31 und TEMT6000"""
+    ## Dummy-Werte oder deine Logik von oben
+    t, h = 22.5, 48.0
+    l_raw = light_sensor.read()
+    return t, h, l_raw
+
+
+## --- Async Tasks --------------------------------------------------------------
 
 async def update_display():
-    """Task: Aktualisiert die Anzeige jede Sekunde"""
+    """Task: Aktualisiert die Anzeige exakt jede Sekunde"""
+    print("Display-Task gestartet.")
     while True:
-        t = rtc.datetime()
-        # t ist ein Tupel: (Jahr, Monat, Tag, Wochentag, Stunde, Minute, Sekunde, Subsekunde)
+        t = rtc_internal.datetime()
+        ## Formatierung: HH:MM:SS
         print("Uhrzeit: {:02d}:{:02d}:{:02d}".format(t[4], t[5], t[6]))
 
-        # Hier kommt später dein HUB75- oder Segment-Display-Code hin
-        await asyncio.sleep(1)
+        ## --- DRIFT-KOMPENSATION ---
+        ## Wir berechnen, wie viele Millisekunden bis zur nächsten vollen Sekunde fehlen.
+        ## Das verhindert, dass die Anzeige langsam "wandert".
+        ms_to_next_second = 1000 - (time.ticks_ms() % 1000)
+        await asyncio.sleep_ms(ms_to_next_second)
+
 
 async def read_sensors():
     """Task: Sensorwerte alle 30 Sekunden lesen"""
     while True:
-        # Hier später: bme280.read_temperature()
-        print("Sensoren werden gelesen...")
+        temp, hum, lux = get_sensors()
+        print(f"[{time.ticks_ms()}] Sensoren -> Temp: {temp}°C, Feuchte: {hum}%, Licht-Rohwert: {lux}")
+
+        ## Hier könnte später die Display-Helligkeit angepasst werden
         await asyncio.sleep(30)
 
-async def sync_time():
-    """Task: Zeit-Synchronisation (NTP oder DCF77)"""
-    while True:
-        print("Synchronisiere Zeit...")
-        # Hier später: NTP-Abgleich oder DCF77-Logik
-        # Beispiel: rtc.datetime((2024, 5, 22, 0, 14, 30, 0, 0))
 
-        # Einmal pro Stunde synchronisieren
-        await asyncio.sleep(3600)
+async def sync_time():
+    """Task: Zeit-Synchronisation (Interne RTC <- Externe RTC)"""
+    while True:
+        print("Sync: Abgleich interne RTC mit RV-8263...")
+
+        ## Zeit von der präzisen externen RTC holen
+        ext_t = get_external_rtc_time()
+
+        ## Interne RTC setzen: (Jahr, Monat, Tag, Wochentag, Std, Min, Sek, Subsek)
+        rtc_internal.datetime((ext_t[0], ext_t[1], ext_t[2], ext_t[3], ext_t[4], ext_t[5], ext_t[6], 0))
+
+        print("Sync abgeschlossen.")
+
+        ## Alle 10 Minuten synchronisieren
+        await asyncio.sleep(600)
+
 
 async def main():
-    # Alle Tasks gleichzeitig starten
+    print("System-Boot... Starte Tasks.")
+
+    ## Alle Tasks gleichzeitig starten
     await asyncio.gather(
         update_display(),
         read_sensors(),
         sync_time()
     )
 
-# Startschuss
+
+# ## --- Integration in asyncio main-Gerüst --------------------------------------
+# async def main():
+#     print("System-Boot: Initialisiere Komponenten...")
+
+#     ## 1. Instanz erstellen
+#     dcf = DCF77Parser(27)
+
+#     ## 2. Tasks definieren
+#     ## Wir nutzen gather, um alle Funktionen gleichzeitig "anzuwerfen"
+#     print("Starte Event-Loop...")
+#     await asyncio.gather(
+#         dcf.run(),                # DCF-Parser
+#         # update_display(),       # Display-Aktualisierung
+#         # read_sensors(),         # Sensoren (SHT31/Licht)
+#         # sync_logic(dcf)         # eine neue Funktion, die auf dcf.sync_ready wartet
+#     )
+
+# async def sync_logic(dcf_instance):
+#     """Prüft im Hintergrund, ob der DCF-Parser neue Daten hat"""
+#     while True:
+#         if dcf_instance.sync_ready:
+#             print(f"\n[SYNC] Neue DCF-Zeit empfangen: {dcf_instance.current_time}")
+#             # Hier: rtc.datetime(dcf_instance.current_time)
+#             dcf_instance.sync_ready = False
+#         await asyncio.sleep(5)
+
+
+## --- Startschuss --------------------------------------------------------------
+
 try:
     asyncio.run(main())
 except KeyboardInterrupt:
-    print("Uhr gestoppt.")
+    print("\nUhr gestoppt. Kehre zum Prompt zurück.")

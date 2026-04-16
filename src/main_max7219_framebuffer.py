@@ -1,18 +1,20 @@
+import framebuf
+import time
+import machine
+
+import max7219
+
+
 ## MAX7219 LED-Matrix Herz-Icon
 ## Binärdarstellung für ein Herz (1 = LED an, 0 = LED aus)
 ## 01100110 -> 0x66
 ## 11111111 -> 0xFF
 ## ... usw.
 
-import framebuf
-import time
-import max7219
-from machine import Pin, SPI
-
 ## SPI Konfiguration (Beispiel für ESP32)
-## Für Pico: spi = SPI(0, baudrate=10000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19))
-spi = SPI(1, baudrate=10000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(23))
-cs = Pin(5, Pin.OUT)
+## Für Pico: spi = machine.SPI(0, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(18), mosi=machine.Pin(19))
+spi = machine.SPI(1, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(18), mosi=machine.Pin(23))
+cs = machine.Pin(5, machine.Pin.OUT)
 
 ## 4 Module à 8x8 Pixel = 32 Breite, 8 Höhe
 display = max7219.Matrix8x8(spi, cs, 4)
@@ -30,7 +32,6 @@ def draw_icon(data, x_pos, y_pos):
     display.blit(fb, x_pos, y_pos)
     display.show()
 
-# for _ in range(3):
 while True:
     ## Animation: Das Herz wandert über die 4 Module
     display.fill(0)

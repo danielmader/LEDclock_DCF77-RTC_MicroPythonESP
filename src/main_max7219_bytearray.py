@@ -1,11 +1,13 @@
 import time
+import machine
+
 import max7219
-from machine import Pin, SPI
+
 
 ## SPI Konfiguration (Beispiel für ESP32)
-## Für Pico: spi = SPI(0, baudrate=10000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19))
-spi = SPI(1, baudrate=10000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(23))
-cs = Pin(5, Pin.OUT)
+## Für Pico: spi = machine.SPI(0, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(18), mosi=machine.Pin(19))
+spi = machine.SPI(1, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(18), mosi=machine.Pin(23))
+cs = machine.Pin(5, machine.Pin.OUT)
 
 ## 4 Module à 8x8 Pixel = 32 Breite, 8 Höhe
 display = max7219.Matrix8x8(spi, cs, 4)
@@ -33,7 +35,5 @@ def demo():
         display.show()
         time.sleep(0.05)
 
-# while True:
-#     demo()
-for _ in range(3):
+while True:
     demo()
