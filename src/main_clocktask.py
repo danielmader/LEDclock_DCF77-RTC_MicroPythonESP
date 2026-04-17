@@ -2,6 +2,7 @@ import asyncio
 import machine
 import time
 
+
 ## Zugriff auf die interne Hardware-Uhr
 rtc = machine.RTC()
 

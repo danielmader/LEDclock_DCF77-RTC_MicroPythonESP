@@ -2,9 +2,9 @@ import machine
 import time
 
 
-## ADC initialisieren an GPIO 34
+## ADC initialisieren
 ## ADC.ATTN_11DB ermöglicht den vollen Messbereich bis ca. 3.1V - 3.3V
-adc = machine.ADC(machine.Pin(34))
+adc = machine.ADC(machine.Pin(36))
 adc.atten(machine.ADC.ATTN_11DB)
 
 

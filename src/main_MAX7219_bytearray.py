@@ -4,9 +4,8 @@ import machine
 import max7219
 
 
-## SPI Konfiguration (Beispiel für ESP32)
-## Für Pico: spi = machine.SPI(0, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(18), mosi=machine.Pin(19))
-spi = machine.SPI(1, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(18), mosi=machine.Pin(23))
+## SPI Konfiguration
+spi = machine.SPI(1, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(19), mosi=machine.Pin(18))
 cs = machine.Pin(5, machine.Pin.OUT)
 
 ## 4 Module à 8x8 Pixel = 32 Breite, 8 Höhe

@@ -2,6 +2,11 @@ import network
 import machine
 import time
 
+## 0) I²C Bus 0 scannen, mit Standard-Hardware-Pins: SCL=22, SDA=23
+i2c = machine.I2C(0, scl=machine.Pin(22), sda=machine.Pin(23), freq=100000)
+devices = i2c.scan()
+print("Gefundene I2C Adressen:", [hex(d) for d in devices])
+
 ## 1) WLAN Access Point konfigurieren
 ap = network.WLAN(network.AP_IF)
 ap.active(True)
