@@ -2,6 +2,9 @@ import asyncio
 import machine
 import time
 
+## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
+dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+
 
 ##==============================================================================
 class DCFReceiver:
@@ -34,9 +37,9 @@ class DCFReceiver:
             if diff > 1500:
                 print("\n--- Minutenpause erkannt ---")
 
-## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
 
-dcf_pin = machine.Pin(27, machine.Pin.IN, machine.Pin.PULL_UP)
+## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
+dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
 dcf = DCFReceiver(dcf_pin)
 
 

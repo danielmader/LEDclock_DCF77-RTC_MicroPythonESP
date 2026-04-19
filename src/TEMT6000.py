@@ -3,11 +3,12 @@ import time
 
 
 ## ADC initialisieren
-## ADC.ATTN_11DB ermöglicht den vollen Messbereich bis ca. 3.1V - 3.3V
 adc = machine.ADC(machine.Pin(36))
+## ADC.ATTN_11DB ermöglicht den vollen Messbereich bis ca. 3.1V - 3.3V
 adc.atten(machine.ADC.ATTN_11DB)
 
 
+##==============================================================================
 def read_light():
     ## Rohwert lesen (0 - 4095)
     raw_value = adc.read()
@@ -19,6 +20,7 @@ def read_light():
 ##******************************************************************************
 ##******************************************************************************
 if __name__ == "__main__":
+
     print("Lichtsensor-Test startet (TEMT6000)...")
     try:
         while True:

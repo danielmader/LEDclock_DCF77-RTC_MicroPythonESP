@@ -1,11 +1,12 @@
-import network
 import machine
+import network
 import time
 
-## 0) I²C Bus 0 scannen, mit Standard-Hardware-Pins: SCL=22, SDA=23
+## 1) I2C-Bus Initialisierung für ESP32 mit Standard Hardware-Pin
 i2c = machine.I2C(0, scl=machine.Pin(22), sda=machine.Pin(23), freq=100000)
+print("Initialisiere I²C Bus...")
 devices = i2c.scan()
-print("Gefundene I2C Adressen:", [hex(d) for d in devices])
+print("Gefundene I²C Adressen:", [hex(d) for d in devices])
 
 ## 1) WLAN Access Point konfigurieren
 ap = network.WLAN(network.AP_IF)
