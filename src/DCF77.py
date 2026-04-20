@@ -5,7 +5,7 @@ import machine
 
 
 ##==============================================================================
-class DCF77Integrator:
+class DCF77:
     def __init__(self, pin_no, led_pin=2, debounce_ms=30):
         ## DCF-Eingang
         self.pin = machine.Pin(pin_no, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -81,6 +81,7 @@ class DCF77Integrator:
 
                         ## Prüfen, ob die Pause davor die Minutenmarke war
                         if time.ticks_diff(now, self.last_pulse_end) > 1500:  # 1700ms?
+                            print(f"\n--- Minute vollständig ({len(self.bits)} Bits). ---")
                             if len(self.bits) >= 58:
                                 self.current_time = self._decode_telegram()
                                 if self.current_time:
@@ -97,9 +98,14 @@ class DCF77Integrator:
 
                         if 70 < pulse_dur < 150:
                             self.bits.append(0)
+                            print("0", end="")
                         elif 170 < pulse_dur < 280:
                             self.bits.append(1)
+                            print("1", end="")
 
+                        ## Alle 10 Bits ein Leerzeichen für die Lesbarkeit
+                        if len(self.bits) % 10 == 0:
+                            print(" ", end="")
             else:
                 self.last_change_time = now
 
@@ -113,7 +119,7 @@ if __name__ == "__main__":
 
     ## Beispiel für die Integration in main.py
     async def main():
-        dcf = DCF77Integrator(pin_no=13)
+        dcf = DCF77(pin_no=13)
 
         ## Task im Hintergrund starten
         asyncio.create_task(dcf.run())
