@@ -2,7 +2,6 @@ import asyncio
 import time
 
 import machine  # type: ignore
-
 from dcf77_parser import DCF77Parser  # type: ignore
 
 ## --- Hardware Setup -----------------------------------------------------------

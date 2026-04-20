@@ -6,7 +6,7 @@ import machine
 
 ##==============================================================================
 class DCF77:
-    def __init__(self, pin_no, led_pin=2, debounce_ms=30):
+    def __init__(self, pin_no, led_pin=2, debounce_ms=30, on_sync=None):
         ## DCF-Eingang
         self.pin = machine.Pin(pin_no, machine.Pin.IN, machine.Pin.PULL_UP)
         ## Interne LED (meist GPIO 2)
@@ -22,6 +22,14 @@ class DCF77:
         self.last_pulse_end = time.ticks_ms()
         self.sync_ready = False
         self.current_time = None  # (Jahr, Monat, Tag, Wochentag, Std, Min)
+        self._line_open = False
+        self.on_sync = on_sync
+
+    def flush_output_line(self):
+        """Sorgt fuer einen sauberen Zeilenumbruch bei Inline-Ausgaben."""
+        if self._line_open:
+            print()
+            self._line_open = False
 
     def _bcd_to_int(self, bit_list):
         """Konvertiere eine Liste von Bits (LSB first) in eine Ganzzahl"""
@@ -58,7 +66,7 @@ class DCF77:
             print("Dekodierungsfehler:", e)
             return
 
-    async def run(self):
+    async def run(self):  # noqa: C901
         print(f"DCF77 Background Task gestartet ({self.pin})...")
 
         while True:
@@ -71,21 +79,27 @@ class DCF77:
                 ## Software-Filter (Debouncing)
                 if time.ticks_diff(now, self.last_change_time) > self.debounce_ms:
                     ## Zustand ist nun stabil gewechselt
-                    old_state = self.last_stable_state
                     self.last_stable_state = current_state
-                    duration = time.ticks_diff(now, self.last_change_time)
 
                     ## FALLENDE FLANKE (LOW): Ein neuer Puls beginnt
                     if self.last_stable_state == 0:
                         self.led.value(1)   # LED AN
 
                         ## Prüfen, ob die Pause davor die Minutenmarke war
-                        if time.ticks_diff(now, self.last_pulse_end) > 1500:  # 1700ms?
-                            print(f"\n--- Minute vollständig ({len(self.bits)} Bits). ---")
+                        if time.ticks_diff(now, self.last_pulse_end) > 1700:
+                            print("*", end="")
+                            self._line_open = True
+                            self.flush_output_line()
+                            print(f"--- Minute vollständig ({len(self.bits)} Bits). ---")
                             if len(self.bits) >= 58:
                                 self.current_time = self._decode_telegram()
                                 if self.current_time:
                                     self.sync_ready = True
+                                    if self.on_sync:
+                                        try:
+                                            self.on_sync(self.current_time)
+                                        except Exception as e:
+                                            print("on_sync Fehler:", e)
                             self.bits = [] # Buffer leeren für neue Minute
                         self.pulse_start_time = now
 
@@ -99,18 +113,21 @@ class DCF77:
                         if 70 < pulse_dur < 150:
                             self.bits.append(0)
                             print("0", end="")
+                            self._line_open = True
                         elif 170 < pulse_dur < 280:
                             self.bits.append(1)
                             print("1", end="")
+                            self._line_open = True
 
                         ## Alle 10 Bits ein Leerzeichen für die Lesbarkeit
                         if len(self.bits) % 10 == 0:
                             print(" ", end="")
+                            self._line_open = True
             else:
                 self.last_change_time = now
 
             ## Kurze Pause, um anderen Tasks Zeit zu geben
-            await asyncio.sleep_ms(10)
+            await asyncio.sleep_ms(5)
 
 
 ##******************************************************************************
@@ -118,19 +135,22 @@ class DCF77:
 if __name__ == "__main__":
 
     ## Beispiel für die Integration in main.py
+    def handle_sync(sync_time):
+        print(f"[SYNC SUCCESS] Zeit: {sync_time}")
+
     async def main():
-        dcf = DCF77(pin_no=13)
+        dcf = DCF77(pin_no=13, on_sync=handle_sync)
 
         ## Task im Hintergrund starten
         asyncio.create_task(dcf.run())
 
         while True:
             if dcf.sync_ready:
-                print(f"\n[SYNC SUCCESS] Zeit: {dcf.current_time}")
+                ## Flag bleibt fuer Programmlogik nutzbar, ohne hier zu drucken.
                 dcf.sync_ready = False  # Flag zurücksetzen
 
             ## Hier andere Dinge tun (Display etc.)
-            await asyncio.sleep(1)
+            await asyncio.sleep(10)
 
     try:
         asyncio.run(main())
