@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-import machine
+import machine  # type: ignore
 
 
 ##==============================================================================
@@ -68,8 +68,9 @@ class DCF77Parser:
 
                     ## Wenn die Pause vorher > 1500ms war, ist jetzt eine neue Minute!
                     if duration > 1500: # Minutenpause
-                        print(f"\n--- Minute vollständig ({len(self.bits)} Bits). Dekodiere... ---")
+                        print(f"\n--- Minute vollständig ({len(self.bits)} Bits). ---")
                         if len(self.bits) >= 58:
+                            print("Versuche zu dekodieren...")
                             result = self._decode_telegram()
                             if result:
                                 self.current_time = result

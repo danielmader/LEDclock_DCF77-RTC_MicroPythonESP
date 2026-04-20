@@ -1,9 +1,9 @@
 import asyncio
-import machine
 import time
 
-from dcf77_parser import DCF77Parser
+import machine  # type: ignore
 
+from dcf77_parser import DCF77Parser  # type: ignore
 
 ## --- Hardware Setup -----------------------------------------------------------
 ## Interne RTC des ESP32

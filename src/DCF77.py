@@ -41,17 +41,17 @@ class DCF77Integrator:
                 return
 
             ## Bits 21-27: Minute
-            minute = self.bcd_to_int(self.bits[21:28])
+            minute = self._bcd_to_int(self.bits[21:28])
             ## Bits 29-34: Stunde
-            hour = self.bcd_to_int(self.bits[29:35])
+            hour = self._bcd_to_int(self.bits[29:35])
             ## Bits 36-41: Tag
-            day = self.bcd_to_int(self.bits[36:42])
+            day = self._bcd_to_int(self.bits[36:42])
             ## Bits 45-49: Monat
-            month = self.bcd_to_int(self.bits[45:50])
+            month = self._bcd_to_int(self.bits[45:50])
             ## Bits 50-57: Jahr (zweistellig)
-            year = 2000 + self.bcd_to_int(self.bits[50:58])
+            year = 2000 + self._bcd_to_int(self.bits[50:58])
             ## Bits 42-44: Wochentag
-            weekday = self.bcd_to_int(self.bits[42:45])
+            weekday = self._bcd_to_int(self.bits[42:45])
 
             return (year, month, day, weekday, hour, minute, 0, 0)
         except Exception as e:
@@ -80,7 +80,7 @@ class DCF77Integrator:
                         self.led.value(1)   # LED AN
 
                         ## Prüfen, ob die Pause davor die Minutenmarke war
-                        if time.ticks_diff(now, self.last_pulse_end) > 1700:
+                        if time.ticks_diff(now, self.last_pulse_end) > 1500:  # 1700ms?
                             if len(self.bits) >= 58:
                                 self.current_time = self._decode_telegram()
                                 if self.current_time:

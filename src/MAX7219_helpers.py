@@ -1,9 +1,8 @@
-import framebuf
-import machine
 import time
 
-import max7219
-
+import framebuf  # type: ignore
+import machine  # type: ignore
+import max7219  # type: ignore
 
 ## SPI Konfiguration
 spi = machine.SPI(1, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(19), mosi=machine.Pin(18))

@@ -1,6 +1,6 @@
-import machine
 import time
 
+import machine  # type: ignore
 
 ## Standardadresse der RV-8263
 RTC_ADDR = 0x51

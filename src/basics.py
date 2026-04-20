@@ -1,6 +1,7 @@
-import machine
-import network
 import time
+
+import machine  # type: ignore
+import network  # type: ignore
 
 ## 1) I2C-Bus Initialisierung für ESP32 mit Standard Hardware-Pin
 i2c = machine.I2C(0, scl=machine.Pin(22), sda=machine.Pin(23), freq=100000)

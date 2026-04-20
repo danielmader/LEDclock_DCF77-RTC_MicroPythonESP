@@ -1,5 +1,6 @@
-import machine
 import time
+
+import machine  # type: ignore
 
 ## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
 dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)

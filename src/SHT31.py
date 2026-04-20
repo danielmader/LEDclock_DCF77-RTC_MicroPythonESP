@@ -1,6 +1,6 @@
-import machine
 import time
 
+import machine  # type: ignore
 
 ## SHT31-I2C-Adresse
 SHT31_ADDR = 0x44

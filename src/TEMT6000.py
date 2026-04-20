@@ -1,6 +1,6 @@
-import machine
 import time
 
+import machine  # type: ignore
 
 ## ADC initialisieren
 adc = machine.ADC(machine.Pin(36))
