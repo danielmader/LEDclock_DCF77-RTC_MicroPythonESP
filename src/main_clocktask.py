@@ -7,7 +7,7 @@ import machine  # type: ignore
 rtc = machine.RTC()
 
 ## Beispiel: Einmalig die Zeit setzen (Jahr, Monat, Tag, Wochentag, Std, Min, Sek, Subsek)
-# rtc.datetime((2024, 5, 23, 3, 12, 0, 0, 0))
+rtc.datetime((2026, 4, 21, 3, 12, 0, 0, 0))
 
 async def clock_task():
     while True:

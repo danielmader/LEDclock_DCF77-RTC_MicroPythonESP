@@ -1,0 +1,277 @@
+import time
+
+import machine  # type: ignore
+
+
+##==============================================================================
+def bcd_to_dec(bcd):
+    """Konvertiert Binary Coded Decimal zu Dezimal."""
+    return (bcd // 16) * 10 + (bcd % 16)
+
+# bcd_to_dec(0x25)  # Beispiel: 0x25 (BCD) -> 25 (Dezimal)
+# bcd_to_dec(0x59)  # Beispiel: 0x59 (BCD) -> 59 (Dezimal)
+
+
+##==============================================================================
+def dec_to_bcd(dec):
+    """Konvertiert Dezimal zu Binary Coded Decimal."""
+    return (dec // 10) << 4 | (dec % 10)
+
+# dec_to_bcd(25)  # Beispiel: 25 (Dezimal) -> 0x25 (BCD)
+# dec_to_bcd(59)  # Beispiel: 59 (Dezimal) -> 0x59 (BCD)
+
+
+##==============================================================================
+class RV8263:
+    """
+    RV-8263 Register:
+        00 Control1
+        Control2
+        Offset
+        RAM
+        04 Seconds
+        Minutes
+        Hours
+        Date
+        Weekday
+        Month
+        Year
+        0B Seconds Alarm
+        Minutes Alarm
+        Hours Alarm
+        Date Alarm
+        Weekday Alarm
+        Timer Value
+        11 Timer Mode
+
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    | Address | Function           | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   00h   | Control1           | TEST  |  SR   | STOP  |  SR   |  CIE  | 12_24 |  CAP  |       |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   01h   | Control2           |  AIE  |  AF   |  MI   |  HMI  |  TF   |       FD      |       |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   02h   | Offset             | MODE  |                     OFFSET                            |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   03h   | RAM                |                            RAM data                           |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   04h   | Seconds            |  OS   |  40   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   05h   | Minutes            |   X   |  40   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |         | Hours (24 hour)    |   X   |   X   |  20   |  10   |   8   |   4   |   2   |   1   |
+    |   06h   +--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |         | Hours (12 hour)    |   X   |   X   | AMPM  |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   07h   | Date               |   X   |   X   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   08h   | Weekday            |   X   |   X   |   X   |   X   |   X   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   09h   | Month              |   X   |   X   |   X   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   0Ah   | Year               |  80   |  40   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   0Bh   | Seconds Alarm      | AE_S  |  40   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   0Ch   | Minutes Alarm      | AE_M  |  40   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |         | Hours Alarm (24h)  | AE_H  |   X   |  20   |  10   |   8   |   4   |   2   |   1   |
+    |   0Dh   +--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |         | Hours Alarm (12h)  | AE_H  |   X   | AMPM  |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   0Eh   | Date Alarm         | AE_D  |   X   |  20   |  10   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   0Fh   | Weekday Alarm      | AE_W  |   X   |   X   |   X   |   X   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   10h   | Timer Value        |  128  |  64   |  32   |  16   |   8   |   4   |   2   |   1   |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    |   11h   | Timer Mode         |   X   |   X   |   X   |      TD       |  TE   |  TIE  | TI_TP |
+    +---------+--------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+    """
+
+    ## Standard-I2C-Adresse der RV-8263
+    RTC_ADDR = 0x51
+
+    ##--------------------------------------------------------------------------
+    @staticmethod
+    def rv_weekday_to_machine(rv_weekday):
+        """RV: 0=So..6=Sa -> MicroPython: 0=Mo..6=So."""
+        return (rv_weekday + 6) % 7
+
+    ##--------------------------------------------------------------------------
+    @staticmethod
+    def machine_weekday_to_rv(machine_weekday):
+        """MicroPython: 0=Mo..6=So -> RV: 0=So..6=Sa."""
+        return (machine_weekday + 1) % 7
+
+    ##--------------------------------------------------------------------------
+    @staticmethod
+    def dcf_weekday_to_rv(dcf_weekday):
+        """DCF77: 1=Mo..7=So -> RV: 0=So..6=Sa."""
+        return dcf_weekday % 7
+
+    ##--------------------------------------------------------------------------
+    @staticmethod
+    def dcf_weekday_to_machine(dcf_weekday):
+        """DCF77: 1=Mo..7=So -> MicroPython: 0=Mo..6=So."""
+        return (dcf_weekday - 1) % 7
+
+    ##--------------------------------------------------------------------------
+    def __init__(self, i2c):
+        self.i2c = i2c
+        if not self.scan_bus():
+            raise Exception(f"RTC 'RV-8263' nicht gefunden auf Adresse {hex(self.RTC_ADDR)}")
+
+    ##--------------------------------------------------------------------------
+    def scan_bus(self):
+        # print("Scanne I²C Bus...")
+        devices = self.i2c.scan()
+        if not devices:
+            print("Fehler: Keine I²C-Geräte gefunden! Verkabelung prüfen.")
+            return False
+        # print(f"Gefundene Geräte: {[hex(d) for d in devices]}")
+        return self.RTC_ADDR in devices
+
+    ##--------------------------------------------------------------------------
+    def init_rtc(self):
+        print("Initialisiere RTC...")
+        ## Register 0x00 (Control 1) auf 0 -> startet den Oszillator
+        ## Register 0x01 (Control 2) auf 0 -> löscht Alarme/Interrupts
+        # self.i2c.writeto_mem(self.RTC_ADDR, 0x00, b'\x00')
+        # self.i2c.writeto_mem(self.RTC_ADDR, 0x01, b'\x00')
+        self.i2c.writeto_mem(self.RTC_ADDR, 0x00, b'\x00\x00')
+        ## Optional: Einmal eine Test-Zeit schreiben (z.B. 12:00:00)
+        ## Register 0x04 ist Sekunden, 0x05 Minuten, 0x06 Stunden
+        ## Wir schreiben ab 0x01: Sek=10, Min=0, Std=12 (alles in BCD)
+        # self.i2c.writeto_mem(self.RTC_ADDR, 0x04, b'\x10\x00\x12')
+
+    ##--------------------------------------------------------------------------
+    def get_rtc_seconds(self):
+        ## Register 0x04 ist bei der RV-8263 das Sekunden-Register
+        try:
+            data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 1)
+            ## Bit 7 ist oft ein Flag (VL - Voltage Low), daher mit 0x7F maskieren
+            seconds_bcd = data[0] & 0x7F  # 0x7F = 0111 1111, um Bit 7 zu ignorieren
+            sec = bcd_to_dec(seconds_bcd)
+
+            return sec
+        except Exception as e:
+            print(f"Fehler beim Lesen der RTC: {e}")
+            return
+
+    ##--------------------------------------------------------------------------
+    def get_rtc_time(self):
+        """Liefert Zeit als (Y, M, D, weekday(0=Mo..6=So), h, m, s)."""
+        now = self.get_rtc_time_rv()
+        if now is None:
+            return None
+
+        year, month, date, rv_weekday, hour, minute, second = now
+        machine_weekday = self.rv_weekday_to_machine(rv_weekday)
+        return (year, month, date, machine_weekday, hour, minute, second)
+
+    ##--------------------------------------------------------------------------
+    def get_rtc_time_rv(self):
+        """Liefert rohe RV-Zeit als (Y, M, D, weekday(0=So..6=Sa), h, m, s)."""
+        ## Lese 7 Bytes ab Register 0x04
+        try:
+            data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 7)
+            sec = bcd_to_dec(data[0] & 0x7F)  #   0x7F = 0111 1111, um Bit 7 zu ignorieren
+            min = bcd_to_dec(data[1] & 0x7F)  #   0x7F = 0111 1111, um Bit 7 zu ignorieren
+            hour = bcd_to_dec(data[2] & 0x3F)  #  0x3F = 0011 1111, um Bit 6-7 zu ignorieren (24h Modus Maske)
+            date = bcd_to_dec(data[3] & 0x3F)  #  0x3F = 0011 1111, um Bit 6-7 zu ignorieren
+            weekday = data[4] & 0x07  #           0x07 = 0000 0111, um Bit 3-7 zu ignorieren (nur die unteren 3 Bits für Wochentag)
+            month = bcd_to_dec(data[5] & 0x1F)  # 0x1F = 0001 1111, um Bit 5-7 zu ignorieren
+            year = bcd_to_dec(data[6]) + 2000  # Jahr wird als Offset ab 2000 erwartet
+
+            return (year, month, date, weekday, hour, min, sec)
+        except Exception as e:
+            print(f"Fehler beim Lesen der RTC: {e}")
+            return
+
+    ##--------------------------------------------------------------------------
+    def get_rtc_time_machine(self):
+        """Liefert die Zeit im Format von machine.RTC().datetime()."""
+        now = self.get_rtc_time()
+        if now is None:
+            return None
+
+        year, month, date, machine_weekday, hour, minute, second = now
+        return (year, month, date, machine_weekday, hour, minute, second, 0)
+
+    ##--------------------------------------------------------------------------
+    def set_rtc_time(self, year, month, date, weekday, hours, minutes, seconds):
+        """
+        Stellt die Zeit der RV-8263 ein.
+        Erwartet weekday im MicroPython-Format (0=Mo..6=So).
+        Register: 0x04=Sek, 0x05=Min, 0x06=Std, 0x07=Tag, 0x08=Wochentag, 0x09=Monat, 0x0A=Jahr
+        """
+        try:
+            rv_weekday = self.machine_weekday_to_rv(weekday)
+            ## Datenpaket vorbereiten (BCD konvertiert)
+            ## Jahr wird zweistellig erwartet (z.B. 24 für 2024)
+            data = bytes([
+                dec_to_bcd(seconds),
+                dec_to_bcd(minutes),
+                dec_to_bcd(hours),
+                dec_to_bcd(date),
+                rv_weekday,
+                dec_to_bcd(month),
+                dec_to_bcd(year % 100)
+            ])
+            ## In einem Rutsch ab Register 0x04 schreiben
+            self.i2c.writeto_mem(self.RTC_ADDR, 0x04, data)
+        except Exception as e:
+            print(f"Fehler beim Schreiben der RTC: {e}")
+            return
+
+    ##--------------------------------------------------------------------------
+    def set_rtc_time_rv(self, year, month, date, rv_weekday, hours, minutes, seconds):
+        """Setzt die RTC mit rohem RV-weekday (0=So..6=Sa)."""
+        machine_weekday = self.rv_weekday_to_machine(rv_weekday)
+        self.set_rtc_time(year, month, date, machine_weekday, hours, minutes, seconds)
+
+    ##--------------------------------------------------------------------------
+    def set_rtc_time_from_machine(self, machine_datetime):
+        """Setzt die RTC aus einem machine.RTC().datetime()-Tupel."""
+        year, month, date, machine_weekday, hour, minute, second, _ = machine_datetime
+        self.set_rtc_time(year, month, date, machine_weekday, hour, minute, second)
+
+
+##******************************************************************************
+##******************************************************************************
+if __name__ == "__main__":
+
+    ## I2C-Bus-Initialisierung mit expliziten Pin-Definitionen für die ESP32-Standard-Pins SCL=22 SDA=23 und Pull-ups.
+    ## Mit externen 10k-Widerständen kann 'pull=None' gesetzt werden, ansonsten ist der interne Pull-up hilfreich.
+    ## => Zur Sicherheit interne Pull-ups zusätzlich an.
+    sda_pin = machine.Pin(23, machine.Pin.IN, machine.Pin.PULL_UP)
+    scl_pin = machine.Pin(22, machine.Pin.IN, machine.Pin.PULL_UP)
+    ## freq=100000 (100kHz) ist sehr stabil für RTCs
+    ## => Reduziere auf 50kHz, um Störung des DCF77-Empfangs zu minimieren
+    i2c = machine.I2C(0, scl=scl_pin, sda=sda_pin, freq=50000)
+
+    ## Externe RTC initialisieren (Oszillator starten, Alarme löschen)
+    rtc_ext = RV8263(i2c)
+    rtc_ext.init_rtc()
+    print("externe RTC-Zeit:", rtc_ext.get_rtc_time())
+
+    ## Interne RTC initialisieren
+    rtc_int = machine.RTC()
+    print("interne RTC-Zeit:", rtc_int.datetime())
+
+    ## Beispiel: Setze die Uhr auf den 19. April 2026, Sonntag, 13:30:00
+    ## Public API nutzt MicroPython weekday: 0=Mo..6=So
+    now = (2026, 4, 19, 6, 13, 30, 0)
+    print("Startzeit:       ", now)
+    rtc_ext.set_rtc_time(2026, 4, 19, 6, 13, 30, 0)
+    rtc_int.datetime(rtc_ext.get_rtc_time_machine())
+
+    ## Aktuelle Zeit auslesen und anzeigen
+    for _ in range(10):
+        sec = rtc_ext.get_rtc_seconds()
+        ext_time = rtc_ext.get_rtc_time()
+        print("externe RTC-Zeit:", ext_time, sec)
+        int_time = rtc_int.datetime()
+        print("interne RTC-Zeit:", int_time)
+        time.sleep(1)
