@@ -25,6 +25,90 @@ Batterie-Backup für RV-8263 RTC
     Batterie (-) -----------------------------------+
 
 
+* R1 = R2: 10 kOhm
+* D1 = D2: Schottky-Diode BAT 42/43 oder BAT 86
+
+
+Schaltoption für Display (nachts aus)
+-------------------------------------
+
+                    +3V3
+                    |
+                    |      Q1 (P-MOSFET, z.B. AO3407A)
+                    +------S
+                            |
+    ESP_GPIO ---- R1 220 ---G
+                            |
+                            +---- R2 100k ---- GND
+                            |
+                            D-------------------------> VCC_BAUTEIL (geschaltete 3,3V)
+
+    GND ESP ------------------------------------------> GND_BAUTEIL
+
+
+* Q1: AO3407A (P-Kanal MOSFET, SOT-23)
+* R1: 220 Ohm (GPIO zu Gate)
+* R2: 100 kOhm (Gate nach GND, sorgt für Default EIN)
+
+Variante 2 für Schaltoption (sichere Pegel mit 3.3V-GPIO)
+---------------------------------------------------------
+
+                    +5V
+                    |
+                    |        Q1 P-MOSFET (z.B. AO3407A)
+                    +--------S
+                                |
+                                D-----------------------> +V_BAUTEIL (geschaltete 5V)
+                                |
+                                G----R5 220----+
+                                |              |
+                            R1 100k         C
+                                |             Q3 PNP (z.B. BC857, SOT-23)
+                            GND             E
+                                            |
+                                            +5V
+                                            |
+                                R2 47k       |
+    +5V -------------------------/\/\/\---------+---- B (Q3)
+                                                |
+                                                C
+                                            Q2 NPN (z.B. BC847, SOT-23)
+                                                E
+                                                |
+                                                GND
+
+    ESP_GPIO ---- R3 10k ---- B (Q2)
+                        |
+                    R4 100k
+                        |
+                    GND
+
+    GND ESP ------------------------------------------ GND_BAUTEIL
+
+* R1 = 100k, zieht Gate von Q1 nach GND, dadurch Default EIN.
+* R2 = 47k, zieht Basis von Q3 nach +5V, hält Q3 im Default AUS.
+* R3 = 10k, Basiswiderstand für Q2 vom ESP-GPIO.
+* R4 = 100k, hält Q2 sicher AUS bei schwebendem GPIO.
+* R5 = 220 Ohm, Gate-Serienwiderstand für Q1.
+
+### Funktionsweise
+
+Default beim Boot (GPIO hochohmig): Q2 AUS, Q3 AUS, Q1-Gate wird über R1 auf GND gezogen, Q1 EIN, Bauteil versorgt.
+GPIO Low: gleiches Verhalten, bleibt EIN.
+GPIO High 3,3V: Q2 EIN, zieht Q3-Basis nach GND, Q3 EIN, Q1-Gate wird auf +5V gezogen, Q1 AUS, Bauteil stromlos.
+
+### Warum sichere Pegel
+
+ESP-Pin hängt nur an der Basis von Q2 über R3, bekommt keine 5V zurück.
+Die 5V-Umschaltung passiert in der Transistorstufe Q2/Q3 und am Gate von Q1.
+Damit ist die Pegelanpassung elektrisch sauber und robust.
+
+### Praktische Hinweise
+
+Direkt am Bauteil 100 nF zwischen +V_BAUTEIL und GND.
+Falls Last größer ist: zusätzlich 10 µF am geschalteten Ausgang.
+Einen GPIO nehmen, der beim Boot nicht kurz aktiv high wird.
+
 Schaltbild Peripherie (ohne Backup-Batterie)
 --------------------------------------------
 
@@ -144,3 +228,38 @@ Empfohlene Belegung auf dem Plan
     MAX7219 an 3V3/GND + GPIO19/GPIO18/GPIO5
     DCF77 an 5V/GND + GPIO13 (Signal auf 3.3V-Pegel anpassen)
 
+Pinouts
+-------
+
+### RV-8263
+* NC
+* Vss
+* NC (CLKOE)
+* NC (INT)
+* VDD
+* NC (CLKOUT)
+* SCL
+* SDA
+
+### SHT31
+* VING
+* GND
+* SCL
+* SDA
+
+### TEMT6000
+* OUT
+* GND
+* VCC
+
+### DCF77
+* VIN
+* SIG
+* GND
+
+### MAX7219
+* VCC
+* GND
+* DIN
+* CS
+* CLK
