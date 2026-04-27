@@ -29,8 +29,8 @@
      inkscape:document-units="mm"
      showgrid="true"
      inkscape:zoom="1.0672963"
-     inkscape:cx="555.60953"
-     inkscape:cy="127.89326"
+     inkscape:cx="528.43807"
+     inkscape:cy="345.26495"
      inkscape:window-width="3374"
      inkscape:window-height="1412"
      inkscape:window-x="0"
@@ -44,7 +44,10 @@
        id="page10039"
        inkscape:label="v1"
        margin="0"
-       bleed="0" /><inkscape:page
+       bleed="0"
+       inkscape:export-filename="Board Layout.pdf"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" /><inkscape:page
        x="320"
        y="0"
        width="210"
