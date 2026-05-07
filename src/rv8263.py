@@ -91,6 +91,7 @@ class RV8263:
 
     ## Standard-I2C-Adresse der RV-8263
     RTC_ADDR = 0x51
+    I2C_RETRIES = 2
 
     ##--------------------------------------------------------------------------
     @staticmethod
@@ -123,6 +124,47 @@ class RV8263:
             raise Exception(f"RTC 'RV-8263' nicht gefunden auf Adresse {hex(self.RTC_ADDR)}")
 
     ##--------------------------------------------------------------------------
+    def _read_regs(self, reg, length):
+        """Liest Register robust, mit Fallback fuer Controller ohne readfrom_mem-Support."""
+        last_exc = None
+        for _ in range(self.I2C_RETRIES):
+            try:
+                return self.i2c.readfrom_mem(self.RTC_ADDR, reg, length)
+            except OSError as exc:
+                last_exc = exc
+                try:
+                    self.i2c.writeto(self.RTC_ADDR, bytes([reg]))
+                    return self.i2c.readfrom(self.RTC_ADDR, length)
+                except OSError as exc2:
+                    last_exc = exc2
+                    time.sleep_ms(2)
+
+        if last_exc is not None:
+            raise last_exc
+        raise OSError("RTC Lesezugriff fehlgeschlagen")
+
+    ##--------------------------------------------------------------------------
+    def _write_regs(self, reg, data):
+        """Schreibt Register robust, mit Fallback fuer Controller ohne writeto_mem-Support."""
+        last_exc = None
+        for _ in range(self.I2C_RETRIES):
+            try:
+                self.i2c.writeto_mem(self.RTC_ADDR, reg, data)
+                return
+            except OSError as exc:
+                last_exc = exc
+                try:
+                    self.i2c.writeto(self.RTC_ADDR, bytes([reg]) + data)
+                    return
+                except OSError as exc2:
+                    last_exc = exc2
+                    time.sleep_ms(2)
+
+        if last_exc is not None:
+            raise last_exc
+        raise OSError("RTC Schreibzugriff fehlgeschlagen")
+
+    ##--------------------------------------------------------------------------
     def scan_bus(self):
         # print("Scanne I²C Bus...")
         devices = self.i2c.scan()
@@ -139,7 +181,8 @@ class RV8263:
         ## Register 0x01 (Control 2) auf 0 -> löscht Alarme/Interrupts
         # self.i2c.writeto_mem(self.RTC_ADDR, 0x00, b'\x00')
         # self.i2c.writeto_mem(self.RTC_ADDR, 0x01, b'\x00')
-        self.i2c.writeto_mem(self.RTC_ADDR, 0x00, b'\x00\x00')
+        # self.i2c.writeto_mem(self.RTC_ADDR, 0x00, b'\x00\x00')
+        self._write_regs(0x00, b'\x00\x00')
         ## Optional: Einmal eine Test-Zeit schreiben (z.B. 12:00:00)
         ## Register 0x04 ist Sekunden, 0x05 Minuten, 0x06 Stunden
         ## Wir schreiben ab 0x01: Sek=10, Min=0, Std=12 (alles in BCD)
@@ -149,7 +192,8 @@ class RV8263:
     def get_rtc_seconds(self):
         ## Register 0x04 ist bei der RV-8263 das Sekunden-Register
         try:
-            data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 1)
+            # data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 1)
+            data = self._read_regs(0x04, 1)
             ## Bit 7 ist oft ein Flag (VL - Voltage Low), daher mit 0x7F maskieren
             seconds_bcd = data[0] & 0x7F  # 0x7F = 0111 1111, um Bit 7 zu ignorieren
             sec = bcd_to_dec(seconds_bcd)
@@ -175,7 +219,8 @@ class RV8263:
         """Liefert rohe RV-Zeit als (Y, M, D, weekday(0=So..6=Sa), h, m, s)."""
         ## Lese 7 Bytes ab Register 0x04
         try:
-            data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 7)
+            # data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 7)
+            data = self._read_regs(0x04, 7)
             sec = bcd_to_dec(data[0] & 0x7F)  #   0x7F = 0111 1111, um Bit 7 zu ignorieren
             min = bcd_to_dec(data[1] & 0x7F)  #   0x7F = 0111 1111, um Bit 7 zu ignorieren
             hour = bcd_to_dec(data[2] & 0x3F)  #  0x3F = 0011 1111, um Bit 6-7 zu ignorieren (24h Modus Maske)
@@ -183,6 +228,12 @@ class RV8263:
             weekday = data[4] & 0x07  #           0x07 = 0000 0111, um Bit 3-7 zu ignorieren (nur die unteren 3 Bits für Wochentag)
             month = bcd_to_dec(data[5] & 0x1F)  # 0x1F = 0001 1111, um Bit 5-7 zu ignorieren
             year = bcd_to_dec(data[6]) + 2000  # Jahr wird als Offset ab 2000 erwartet
+
+            ## Plausibilitaetscheck gegen uninitialisierte/ungueltige BCD-Daten
+            if sec > 59 or min > 59 or hour > 23 or date < 1 or date > 31 or month < 1 or month > 12 or weekday > 6:
+                raise ValueError(
+                    f"Ungueltige RTC-Daten gelesen: year={year}, month={month}, date={date}, weekday={weekday}, hour={hour}, minute={min}, second={sec}"
+                )
 
             return (year, month, date, weekday, hour, min, sec)
         except Exception as e:
@@ -220,7 +271,8 @@ class RV8263:
                 dec_to_bcd(year % 100)
             ])
             ## In einem Rutsch ab Register 0x04 schreiben
-            self.i2c.writeto_mem(self.RTC_ADDR, 0x04, data)
+            # self.i2c.writeto_mem(self.RTC_ADDR, 0x04, data)
+            self._write_regs(0x04, data)
         except Exception as e:
             print(f"Fehler beim Schreiben der RTC: {e}")
             return
@@ -265,7 +317,11 @@ if __name__ == "__main__":
     now = (2026, 4, 19, 6, 13, 30, 0)
     print("Startzeit:       ", now)
     rtc_ext.set_rtc_time(2026, 4, 19, 6, 13, 30, 0)
-    rtc_int.datetime(rtc_ext.get_rtc_time_machine())
+    now_machine = rtc_ext.get_rtc_time_machine()
+    if now_machine is not None:
+        rtc_int.datetime(now_machine)
+    else:
+        print("Interne RTC bleibt unveraendert, da externe RTC-Zeit nicht lesbar ist.")
 
     ## Aktuelle Zeit auslesen und anzeigen
     for _ in range(10):
