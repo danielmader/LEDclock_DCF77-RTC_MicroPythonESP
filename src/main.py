@@ -44,8 +44,10 @@ dcf = dcf77.DCF77(pin_no=13)
 
 DCF_MIN_YEAR = 2020
 MAX_SYNC_JUMP_SECONDS = 12 * 60 * 60
+DCF_PROGRESS_TOLERANCE_SECONDS = 20
 
 _last_dcf_candidate = None
+_last_dcf_candidate_ticks = None
 
 
 def _is_leap_year(year):
@@ -101,9 +103,26 @@ def _is_sync_jump_acceptable(dcf_now, rtc_now):
     return delta <= MAX_SYNC_JUMP_SECONDS
 
 
-def should_accept_dcf_sync(dcf_now, rtc_now):
-    """Akzeptiere DCF-Zeit nur bei Plausibilität + 2x gleicher Kandidat."""
-    global _last_dcf_candidate
+def _is_dcf_progress_consistent(prev_dcf, prev_ticks, curr_dcf, curr_ticks):
+    """Prüft, ob DCF-Zeitfortschritt zur real verstrichenen Zeit passt."""
+    try:
+        prev_epoch = _to_epoch_seconds(prev_dcf[0], prev_dcf[1], prev_dcf[2], prev_dcf[4], prev_dcf[5], prev_dcf[6])
+        curr_epoch = _to_epoch_seconds(curr_dcf[0], curr_dcf[1], curr_dcf[2], curr_dcf[4], curr_dcf[5], curr_dcf[6])
+    except Exception:
+        return False
+
+    dcf_delta = curr_epoch - prev_epoch
+    elapsed_seconds = time.ticks_diff(curr_ticks, prev_ticks) // 1000
+
+    if dcf_delta <= 0:
+        return False
+
+    return abs(dcf_delta - elapsed_seconds) <= DCF_PROGRESS_TOLERANCE_SECONDS
+
+
+def should_accept_dcf_sync(dcf_now, rtc_now, recv_ticks):
+    """Akzeptiere DCF-Zeit nur bei Plausibilität + zeitkonsistenter Folge."""
+    global _last_dcf_candidate, _last_dcf_candidate_ticks
 
     if not _is_dcf_datetime_plausible(dcf_now):
         return False, "DCF-Zeit außerhalb Plausibilitätsbereich"
@@ -111,11 +130,18 @@ def should_accept_dcf_sync(dcf_now, rtc_now):
     if not _is_sync_jump_acceptable(dcf_now, rtc_now):
         return False, "DCF-Sprung zur RTC zu groß"
 
-    if _last_dcf_candidate != dcf_now:
+    if _last_dcf_candidate is None or _last_dcf_candidate_ticks is None:
         _last_dcf_candidate = dcf_now
-        return False, "warte auf zweite identische Minute"
+        _last_dcf_candidate_ticks = recv_ticks
+        return False, "warte auf zeitkonsistente Folge"
 
-    _last_dcf_candidate = None
+    if not _is_dcf_progress_consistent(_last_dcf_candidate, _last_dcf_candidate_ticks, dcf_now, recv_ticks):
+        _last_dcf_candidate = dcf_now
+        _last_dcf_candidate_ticks = recv_ticks
+        return False, "DCF-Folge zeitlich inkonsistent"
+
+    _last_dcf_candidate = dcf_now
+    _last_dcf_candidate_ticks = recv_ticks
     return True, "ok"
 
 ## --- Async-Tasks -------------------------------------------------------------
@@ -160,8 +186,9 @@ async def sync_time():
             dcf.sync_ready = False
             dcf_now = dcf.current_time  # DCF: (year, month, day, weekday(1..7), hours, minutes, seconds)
             rtc_now = rtc_external.get_rtc_time()
+            recv_ticks = time.ticks_ms()
 
-            accepted, reason = should_accept_dcf_sync(dcf_now, rtc_now)
+            accepted, reason = should_accept_dcf_sync(dcf_now, rtc_now, recv_ticks)
             if accepted:
                 year, month, day, dcf_weekday, hour, minute, second = dcf_now
                 machine_weekday = rv8263.RV8263.dcf_weekday_to_machine(dcf_weekday)
