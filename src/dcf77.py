@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-import machine
+import machine  # type: ignore
 
 
 ##==============================================================================
@@ -49,6 +49,31 @@ class DCF77:
     def _even_parity_ok(self, bits, parity_bit):
         """DCF77 nutzt gerade Parität: Summe inkl. Paritätsbit muss gerade sein."""
         return (sum(bits) + parity_bit) % 2 == 0
+
+    ##--------------------------------------------------------------------------
+    def _is_leap_year(self, year):
+        return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+
+    ##--------------------------------------------------------------------------
+    def _days_in_month(self, year, month):
+        if month == 2:
+            return 29 if self._is_leap_year(year) else 28
+        if month in (4, 6, 9, 11):
+            return 30
+        return 31
+
+    ##--------------------------------------------------------------------------
+    def _weekday_dcf_from_date(self, year, month, day):
+        """Berechne DCF-Wochentag: 1=Mo..7=So."""
+        # Sakamoto-Algorithmus: 0=So..6=Sa
+        month_table = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+        y = year
+        if month < 3:
+            y -= 1
+        weekday_sun0 = (y + y // 4 - y // 100 + y // 400 + month_table[month - 1] + day) % 7
+        if weekday_sun0 == 0:
+            return 7
+        return weekday_sun0
 
     ##--------------------------------------------------------------------------
     def _select_telegram_bits(self):
@@ -109,6 +134,16 @@ class DCF77:
             if not (1 <= month <= 12):
                 return None
             if not (1 <= weekday <= 7):
+                return None
+            if year < 2000:
+                return None
+
+            max_day = self._days_in_month(year, month)
+            if day > max_day:
+                return None
+
+            expected_weekday = self._weekday_dcf_from_date(year, month, day)
+            if weekday != expected_weekday:
                 return None
 
             return (year, month, day, weekday, hour, minute, 0)
