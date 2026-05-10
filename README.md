@@ -165,3 +165,15 @@ Pinouts
 * DIN
 * CS
 * CLK
+
+Lochrasterplatinenlayout
+------------------------
+![Schaltplan](./hardware/LEDclock_DCF77-RTC-BAT_Schematic_2026-05-08.png)
+
+![Planung](./hardware/Board%20Layout.svg)
+
+![Grundriss](./hardware/PXL_20260505_182216006.jpg)
+
+![Bestückung](./hardware/PXL_20260510_183133264.jpg)
+
+![Bestückung](./hardware/PXL_20260510_183204663.jpg)
