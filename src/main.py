@@ -4,6 +4,7 @@ import time
 import machine  # type: ignore
 
 import dcf77
+import max7219wrapper
 import rv8263
 import sht31
 import temt6000
@@ -39,6 +40,13 @@ light_sensor = temt6000.TEMT6000(adc_pin=36)
 
 ## 5) DCF77-Sensor
 dcf = dcf77.DCF77(pin_no=13)
+
+## 6) MAX7219-LED-Matrix (2x 4 Module à 8x8 LEDs = 2x 32x8)
+baudrate = 500000  # 500 kHz für maximale Stabilität bei langen Kabeln oder vielen Modulen
+spi = machine.SPI(1, baudrate=baudrate, polarity=0, phase=0, sck=machine.Pin(5), mosi=machine.Pin(19))
+cs = machine.Pin(18, machine.Pin.OUT)
+power_pin = machine.Pin(0, machine.Pin.OUT)
+display = max7219wrapper.Max7219Matrix(spi, cs, num_modules=4, power_pin=power_pin)
 
 ## --- Hilfsfunktionen ---------------------------------------------------------
 
@@ -90,7 +98,7 @@ def _is_sync_jump_acceptable(dcf_now, rtc_now):
 
     rtc_year = rtc_now[0]
     if rtc_year < DCF_MIN_YEAR:
-        # RTC ist noch uninitialisiert oder hat Default-Zeit.
+        ## RTC ist noch uninitialisiert oder hat Default-Zeit.
         return True
 
     try:
@@ -149,18 +157,24 @@ def should_accept_dcf_sync(dcf_now, rtc_now, recv_ticks):
 async def update_display():
     """Task: Aktualisiere das Display im Sekundentakt"""
     while True:
-        # Wir lesen hier die INTERNE ESP-RTC (sehr schnell)
+        ## Wir lesen hier die INTERNE ESP-RTC (sehr schnell)
         now = rtc_internal.datetime()  # Format: (year, month, day, weekday, hours, minutes, seconds)
-        ## DEBUG
-        # print(111111111111111111, now)
         print(f"[DISPLAY] {now[0]}-{now[1]:02d}-{now[2]:02d} | {now[4]:02d}:{now[5]:02d}:{now[6]:02d}")
 
-        ## TODO: Steuerung für HUB75- oder MAX7219-Display
+        display.fill(0)
+        ## 1) Anzeige der Uhrzeit im Format "HH:MM:SS"
+        # time_str = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
+        ## 2) Anzeige der Uhrzeit im Format "HH:MM" mit blinkendem Doppelpunkt
+        if now[6] % 2 == 0:
+            time_str = f"{now[4]:02d}:{now[5]:02d}"
+        else:
+            time_str = f"{now[4]:02d} {now[5]:02d}"
+        display.write_text_centered(time_str, 1, max7219wrapper.FONT_5x7)
 
         ## DRIFT-KOMPENSATION
-        # await asyncio.sleep(1)
         ## Wir berechnen, wie viele Millisekunden bis zur nächsten vollen Sekunde fehlen.
         ## Das verhindert, dass die Anzeige langsam "wandert".
+        # await asyncio.sleep(1)
         ms_to_next_second = 1000 - (time.ticks_ms() % 1000)
         await asyncio.sleep_ms(ms_to_next_second)
 
@@ -173,6 +187,7 @@ async def read_sensors():
         print(f"[SENSORS] {temp:.2f} °C | {hum:.2f} %rF | {lux_perc:.1f} %ADC")
 
         ## TODO: Anpassung der Display-Helligkeit
+        ## TODO: Anzeige von Temperatur/Luftfeuchtigkeit/Helligkeit auf Display (z.B. im Wechsel mit Uhrzeit oder per Knopfdruck)
 
         await asyncio.sleep(5)
 
@@ -180,16 +195,17 @@ async def read_sensors():
 async def sync_time():
     """Task: Zeit-Synchronisation DCF77 > Externe RTC > Interne RTC"""
     while True:
-        ## Zeit des DCF-Moduls auslesen und externe RTC synchronisieren
+        ## Zeit des DCF-Moduls auslesen und RTCs synchronisieren
         if dcf.sync_ready:
             print(f"[SYNC] Neue DCF-Zeit empfangen: {dcf.current_time}")
-            dcf.sync_ready = False
+            dcf.sync_ready = False  # Flag zurücksetzen
             dcf_now = dcf.current_time  # DCF: (year, month, day, weekday(1..7), hours, minutes, seconds)
             rtc_now = rtc_external.get_rtc_time()
             recv_ticks = time.ticks_ms()
 
             accepted, reason = should_accept_dcf_sync(dcf_now, rtc_now, recv_ticks)
             if accepted:
+                ## Externe RTC synchronisieren: DCF-Zeit -> Externe RTC
                 year, month, day, dcf_weekday, hour, minute, second = dcf_now
                 machine_weekday = rv8263.RV8263.dcf_weekday_to_machine(dcf_weekday)
                 rtc_external.set_rtc_time(year, month, day, machine_weekday, hour, minute, second)
@@ -197,25 +213,14 @@ async def sync_time():
             else:
                 print(f"[SYNC] DCF-Zeit verworfen ({reason}): {dcf_now}")
 
-        ## Zeit von der präzisen externen RTC holen
-        now = rtc_external.get_rtc_time()  # Format: (year, month, day, weekday, hours, minutes, seconds)
-        ## DEBUG
-        # print(888888888888888888, now)
+            ## Interne RTC synchronisieren: Externe RTC -> Interne RTC
+            # now = rtc_external.get_rtc_time()  # Format: (year, month, day, weekday, hours, minutes, seconds)
+            now = rtc_external.get_rtc_time_machine()  # Format: (year, month, day, weekday, hours, minutes, seconds, subseconds)
+            if now is not None:
+                rtc_internal.datetime(now)
+                print("[SYNC] Interne RTC mit externer RTC synchronisiert")
 
-        ## Interne RTC setzen: (Jahr, Monat, Tag, Wochentag, Std, Min, Sek, Subsek)
-        now = rtc_external.get_rtc_time_machine()
-        ## DEBUG
-        # print(999999999999999999, now)
-        if now is not None:
-            rtc_internal.datetime(now)
-        # print("RTCs synchronisiert.")
-
-        ## Alle 10 Minuten synchronisieren
-        # await asyncio.sleep(600)
-        ## Alle 60 Sekunden synchronisieren
-        # await asyncio.sleep(60)
-        ## Alle 10 Sekunden synchronisieren
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
 
 
 ##******************************************************************************
@@ -225,13 +230,19 @@ async def main():
     print("Starte Event-Loop...")
     ## Wir nutzen gather, um alle Funktionen gleichzeitig "anzuwerfen"
     await asyncio.gather(
-        dcf.run(),              # DCF-Background-Task
-        read_sensors(),         # Sensoren (SHT31/Licht)
-        sync_time(),            # Zeit-Synchronisation DCF77 > externe RTC > interne RTC
-        update_display(),       # Display-Aktualisierung
+        dcf.run(),         # DCF-Background-Task
+        read_sensors(),    # Sensoren (SHT31/Licht)
+        sync_time(),       # Zeit-Synchronisation DCF77 > externe RTC > interne RTC
+        update_display(),  # Display-Aktualisierung
     )
 
 try:
+    ## RTC-Sync Externe RTC -> Interne RTC zu Beginn, damit die Uhrzeit direkt korrekt ist
+    rtc_now = rtc_external.get_rtc_time_machine()
+    if rtc_now is not None:
+        rtc_internal.datetime(rtc_now)
+        print("[BOOT] Interne RTC mit externer RTC synchronisiert")
     asyncio.run(main())
 except KeyboardInterrupt:
-    print("\nUhr gestoppt. Kehre zum Prompt zurück.")
+    ## Uhr gestoppt
+    pass
