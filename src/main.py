@@ -59,6 +59,9 @@ DCF_PROGRESS_TOLERANCE_SECONDS = 20
 
 _last_dcf_candidate = None
 _last_dcf_candidate_ticks = None
+_latest_temp = None
+_latest_hum = None
+_latest_lux_perc = None
 
 
 def _is_leap_year(year: int) -> bool:
@@ -245,24 +248,37 @@ async def update_display():
     * None
     """
     while True:
+        global _latest_temp, _latest_hum
+
         ## Wir lesen hier die INTERNE ESP-RTC (sehr schnell)
         now = rtc_internal.datetime()  # Format: (year, month, day, weekday, hours, minutes, seconds)
         print(f"[DISPLAY] {now[0]}-{now[1]:02d}-{now[2]:02d} | {now[4]:02d}:{now[5]:02d}:{now[6]:02d}")
 
-        display.fill(0)
-        ## 1) Anzeige der Uhrzeit im Format "HH:MM:SS"
+        ## Display löschen
+        display.clear()
+        ## 1a) Anzeige der Uhrzeit im Format "HH:MM:SS"
         # time_str = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
-        ## 2) Anzeige der Uhrzeit im Format "HH:MM" mit blinkendem Doppelpunkt
+        ## 1b) Anzeige der Uhrzeit im Format "HH:MM" mit blinkendem Doppelpunkt
         if now[6] % 2 == 0:
             time_str = f"{now[4]:02d}:{now[5]:02d}"
         else:
             time_str = f"{now[4]:02d} {now[5]:02d}"
-        display.write_text_centered(time_str, 1, max7219wrapper.FONT_5x7, row=0)
+        display.write_text_centered(time_str, 1, max7219wrapper.FONT_5X7, row=0)
+        ## 2) Sensorwerte auf der zweiten Zeile anzeigen (z.B. Temperatur und Luftfeuchtigkeit)
+        if _latest_temp is None or _latest_hum is None:
+            display.write_text_centered("----", 1, max7219wrapper.FONT_3X5, row=1)
+        else:
+            if now[6] % 10 < 5:
+                display.write_text_centered(f"{_latest_temp:.1f} °C", 1, max7219wrapper.FONT_3X5, row=1)
+            else:
+                display.write_text_centered(f"{_latest_hum:.1f} %", 1, max7219wrapper.FONT_3X5, row=1)
+        ## Neue Anzeige schalten
+        display.show()
 
+        # await asyncio.sleep(1)
         ## DRIFT-KOMPENSATION
         ## Wir berechnen, wie viele Millisekunden bis zur nächsten vollen Sekunde fehlen.
         ## Das verhindert, dass die Anzeige langsam "wandert".
-        # await asyncio.sleep(1)
         ms_to_next_second = 1000 - (time.ticks_ms() % 1000)  # type: ignore[operator]
         await asyncio.sleep_ms(ms_to_next_second)  # type: ignore[attr-defined]
 
@@ -274,9 +290,16 @@ async def read_sensors():
     -------
     * None
     """
+    global _latest_temp, _latest_hum, _latest_lux_perc
+
     while True:
         temp, hum = temphum_sensor.get_measurement()
         _, lux_perc = light_sensor.get_measurement()
+
+        _latest_temp = temp
+        _latest_hum = hum
+        _latest_lux_perc = lux_perc
+
         print(f"[SENSORS] {temp:.2f} °C | {hum:.2f} %rF | {lux_perc:.1f} %ADC")
 
         ## TODO: Anpassung der Display-Helligkeit

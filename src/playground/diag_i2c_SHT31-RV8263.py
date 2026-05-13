@@ -4,8 +4,7 @@ Nutzt nur writeto/readfrom (keine _mem-Funktionen) für direkten Zugriff.
 """
 import time
 
-import machine  # type: ignore
-
+import machine
 
 print("I²C Vergleichstest: SHT31 (0x44) vs RTC (0x51)")
 print("=" * 60)
@@ -22,17 +21,17 @@ print(f"Gefundene Geräte: {[hex(d) for d in devices]}\n")
 ##==============================================================================
 print("### Test 1: SHT31 (0x44) - Manueller Registerzugriff ###")
 try:
-    # Schreibe Befehl "High Repeatability" 0x2C 0x06
+    ## Schreibe Befehl "High Repeatability" 0x2C 0x06
     i2c.writeto(0x44, b'\x2c\x06')
     print("✓ writeto(0x44, Befehl) erfolgreich")
 
     time.sleep(0.05)
 
-    # Lese 6 Bytes zurück
+    ## Lese 6 Bytes zurück
     data = i2c.readfrom(0x44, 6)
     print(f"✓ readfrom(0x44, 6) erfolgreich: {' '.join(f'{b:02x}' for b in data)}")
 
-    # Parse Temperatur
+    ## Parse Temperatur
     temp_raw = (data[0] << 8) | data[1]
     temp = -45 + (175 * temp_raw / 65535.0)
     print(f"  → Temperatur (parsiert): {temp:.2f}°C\n")
@@ -44,17 +43,17 @@ except Exception as e:
 ##==============================================================================
 print("### Test 2: RTC (0x51) - Manueller Registerzugriff ###")
 try:
-    # Schreibe Registeradresse 0x04 (Seconds)
+    ## Schreibe Registeradresse 0x04 (Seconds)
     print("  Versuche: writeto(0x51, [0x04])")
     i2c.writeto(0x51, b'\x04')
     print("  ✓ writeto erfolgreich")
 
-    # Lese 7 Bytes (Sec, Min, Hour, Date, Weekday, Month, Year)
+    ## Lese 7 Bytes (Sec, Min, Hour, Date, Weekday, Month, Year)
     print("  Versuche: readfrom(0x51, 7)")
     data = i2c.readfrom(0x51, 7)
     print(f"  ✓ readfrom erfolgreich: {' '.join(f'{b:02x}' for b in data)}")
 
-    # Parse als BCD
+    ## Parse als BCD
     sec = data[0] & 0x7F
     min_ = data[1] & 0x7F
     hour = data[2] & 0x3F
@@ -66,22 +65,22 @@ try:
     print(f"  → Rohbytes: sec={sec:02x}, min={min_:02x}, hour={hour:02x}, "
           f"date={date:02x}, weekday={weekday:02x}, month={month:02x}, year={year:02x}")
 
-    # Prüfe ob es gültige Zeitdaten sind
+    ## Prüfe ob es gültige Zeitdaten sind
     if (sec <= 0x59 and min_ <= 0x59 and hour <= 0x23 and
         date <= 0x31 and month <= 0x12):
-        print(f"  ✓ Zeitwerte sehen PLAUSIBEL aus!")
+        print("  ✓ Zeitwerte sehen PLAUSIBEL aus!")
     else:
-        print(f"  ❌ Zeitwerte sind MÜLL (unrealistisch)")
-        print(f"     Ist das überhaupt eine RV-8263? Falsch verdrahtet?\n")
+        print("  ❌ Zeitwerte sind MÜLL (unrealistisch)")
+        print("     Ist das überhaupt eine RV-8263? Falsch verdrahtet?\n")
 
 except OSError as e:
     print(f"  ❌ RTC Fehler: {e}")
-    print(f"     0x51 antwortet auf Scan, aber nicht auf Registerzugriff!")
-    print(f"     → Mögliche Ursachen:")
-    print(f"        1. RTC hat keine/zu wenig Stromversorgung")
-    print(f"        2. RTC ist nicht richtig verlötet")
-    print(f"        3. 0x51 ist kein RV-8263 (anderes Gerät / Fakemodul)")
-    print(f"        4. RTC-Kristall ist kaputt oder wird nicht getaktet\n")
+    print("     0x51 antwortet auf Scan, aber nicht auf Registerzugriff!")
+    print("     → Mögliche Ursachen:")
+    print("        1. RTC hat keine/zu wenig Stromversorgung")
+    print("        2. RTC ist nicht richtig verlötet")
+    print("        3. 0x51 ist kein RV-8263 (anderes Gerät / Fakemodul)")
+    print("        4. RTC-Kristall ist kaputt oder wird nicht getaktet\n")
 
 ##==============================================================================
 ## Test 3: Direkter Schreibzugriff auf 0x51 (probe)
@@ -93,7 +92,7 @@ try:
     print("  ✓ writeto erfolgreich")
     time.sleep(0.01)
 
-    # Versuche direkt zu lesen
+    ## Versuche direkt zu lesen
     print("  Versuche: writeto(0x51, [0x00]) + readfrom(0x51, 1)")
     i2c.writeto(0x51, b'\x00')
     data = i2c.readfrom(0x51, 1)

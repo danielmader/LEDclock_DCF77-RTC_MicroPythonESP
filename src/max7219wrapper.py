@@ -4,7 +4,7 @@ import framebuf
 import machine
 import max7219
 
-from characters import FONT_3X5, FONT_5x7
+from characters import FONT_3X5, FONT_5X7
 
 ## SPI Konfiguration
 baudrate = 10000000  # 10 MHz, abhängig von der Verkabelung und Qualität der Verbindung
@@ -67,7 +67,7 @@ class Max7219Matrix(max7219.Matrix8x8):
 
         ## Helligkeit einstellen (0 bis 15)
         self.brightness(self.brightness_level)
-        self.fill(0)
+        self.clear()
         self.show()
 
     ##--------------------------------------------------------------------------
@@ -115,7 +115,7 @@ class Max7219Matrix(max7219.Matrix8x8):
         fb = framebuf.FrameBuffer(data, 8, 8, framebuf.MONO_VLSB)
         ## Kopiert (blit) das Icon an die gewünschte Stelle auf dem Hauptdisplay
         self.blit(fb, x_pos, y_pos)
-        self.show()
+        # self.show()
 
     ##--------------------------------------------------------------------------
     def clear_display(self) -> None:
@@ -126,7 +126,11 @@ class Max7219Matrix(max7219.Matrix8x8):
         * None
         """
         self.fill(0)
-        self.show()
+        # self.show()
+
+    def clear(self) -> None:
+        """Alias für clear_display()."""
+        self.clear_display()
 
     ##--------------------------------------------------------------------------
     def _draw_glyph(self, ch: str, x: int, y: int, font_dict: "dict | str | None") -> None:
@@ -286,7 +290,7 @@ class Max7219Matrix(max7219.Matrix8x8):
         for ch in text_upper:
             width += self._get_glyph_effective_width(ch, font_dict) + spacing
 
-        # Letzten Zeichenabstand nicht mitzählen
+        ## Letzten Zeichenabstand nicht mitzählen
         return max(0, width - spacing)
 
     ##--------------------------------------------------------------------------
@@ -327,7 +331,7 @@ class Max7219Matrix(max7219.Matrix8x8):
         font_dict: "dict | str | None" = "builtin",
         spacing: int = 1,
         clamp: bool = False,
-        clear: bool = True,
+        clear: bool = False,
         row: int = 0,
     ) -> None:
         """Schreibt einen Text horizontal zentriert.
@@ -350,6 +354,7 @@ class Max7219Matrix(max7219.Matrix8x8):
         if clear:
             self.fill(0)
         self.write_text(text, x_pos, y, font_dict, spacing)
+        # self.show()
 
     ##--------------------------------------------------------------------------
     def write_text(self, text: str, x: int, y: int, font_dict: "dict | str | None" = "builtin", spacing: int = 1) -> None:
@@ -378,7 +383,7 @@ class Max7219Matrix(max7219.Matrix8x8):
             for ch in text.upper():
                 self._draw_glyph(ch, x_pos, y, font_dict)
                 x_pos += self._get_glyph_effective_width(ch, font_dict) + spacing
-        self.show()
+        # self.show()
 
     ##--------------------------------------------------------------------------
     def write_scrolling_text(
@@ -466,7 +471,7 @@ class Max7219Matrix(max7219.Matrix8x8):
         -------
         * None
         """
-        self.write_text(text, x, y, FONT_5x7)
+        self.write_text(text, x, y, FONT_5X7)
 
     def write_scrolling_text_compact(self, text: str, y: int, speed_s: float = 0.05) -> None:
         """Scrollt Text in kompakter 5x7-Schrift.
@@ -481,7 +486,7 @@ class Max7219Matrix(max7219.Matrix8x8):
         -------
         * None
         """
-        self.write_scrolling_text(text, y, FONT_5x7, speed_s)
+        self.write_scrolling_text(text, y, FONT_5X7, speed_s)
 
 
 ##******************************************************************************
@@ -530,7 +535,7 @@ if __name__ == "__main__":
 
         ## 4) Demo mit kompakter 5x7-Schrift (größere Ziffern für Uhranzeige)
         display.fill(0)
-        display.write_text_centered("12:45%°", 1, FONT_5x7)
+        display.write_text_centered("12:45%°", 1, FONT_5X7)
         time.sleep(2)
         display.fill(0)
         display.write_text_centered("22.1°  50%", 1, FONT_3X5)
