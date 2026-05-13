@@ -1,24 +1,49 @@
 import asyncio
 import time
 
-import machine  # type: ignore
+import machine
 
 
 ##==============================================================================
 class DCF77:
     ##--------------------------------------------------------------------------
-    def __init__(self, pin_no, led_pin=2, debounce_ms=30, on_sync=None, verbose=False):
-        ## DCF-Eingang
-        self.pin = machine.Pin(pin_no, machine.Pin.IN, machine.Pin.PULL_UP)
+    def __init__(
+        self,
+        dcf_pin: machine.Pin,
+        led_pin: machine.Pin | None = machine.Pin(2, machine.Pin.OUT),
+        debounce_ms: int = 30,
+        on_sync = None,
+        verbose: bool = False,
+    ) -> None:
+        """Initialisiert den DCF77-Empfänger.
+
+        Parameter
+        ---------
+        * pin_no: GPIO des DCF77-Datenpins
+        * led_pin: GPIO der Status-LED
+        * debounce_ms: Entprellzeit für Flanken in Millisekunden
+        * on_sync: Optionaler Callback bei erfolgreicher Synchronisation
+        * verbose: Aktiviert Debug-Ausgaben
+
+        Returns
+        -------
+        * None
+        """
+        ## DCF77-Pin
+        self.dcf_pin = dcf_pin
         ## Interne LED (meist GPIO 2)
-        self.led = machine.Pin(led_pin, machine.Pin.OUT)
+        if led_pin is None:
+            self.led = None
+        else:
+            self.led = led_pin
+
         ## Debounce-Zeit in ms (typisch 20-50ms)
         self.debounce_ms = debounce_ms
 
         ## Variablen für die DCF-Logik
         self.bits = []
         self.last_change_time = time.ticks_ms()
-        self.last_stable_state = self.pin.value()
+        self.last_stable_state = self.dcf_pin.value()
         self.pulse_start_time = 0
         self.last_pulse_end = time.ticks_ms()
         self.sync_ready = False
@@ -28,15 +53,29 @@ class DCF77:
         self.verbose = verbose
 
     ##--------------------------------------------------------------------------
-    def flush_output_line(self):
-        """Sorgt für einen sauberen Zeilenumbruch bei Inline-Ausgaben."""
+    def flush_output_line(self) -> None:
+        """Sorgt für einen sauberen Zeilenumbruch bei Inline-Ausgaben.
+
+        Returns
+        -------
+        * None
+        """
         if self._line_open:
-            self.print()
+            self.printv()
             self._line_open = False
 
     ##--------------------------------------------------------------------------
-    def _bcd_to_int(self, bit_list):
-        """Konvertiere eine Liste von Bits (LSB first) in eine Ganzzahl"""
+    def _bcd_to_int(self, bit_list: list) -> int:
+        """Konvertiert eine Liste von DCF-Bits in eine Ganzzahl.
+
+        Parameter
+        ---------
+        * bit_list: Bitfolge im LSB-first-Format
+
+        Returns
+        -------
+        * int: Dekodierter Zahlenwert
+        """
         weights = [1, 2, 4, 8, 10, 20, 40, 80]
         val = 0
         for i, bit in enumerate(bit_list):
@@ -46,16 +85,47 @@ class DCF77:
         return val
 
     ##--------------------------------------------------------------------------
-    def _even_parity_ok(self, bits, parity_bit):
-        """DCF77 nutzt gerade Parität: Summe inkl. Paritätsbit muss gerade sein."""
+    def _even_parity_ok(self, bits: list, parity_bit: int) -> bool:
+        """Prüft DCF77-Parität (gerade Parität).
+
+        Parameter
+        ---------
+        * bits: Nutzdatenbits
+        * parity_bit: Zugehöriges Paritätsbit
+
+        Returns
+        -------
+        * bool: True, wenn die Parität korrekt ist
+        """
         return (sum(bits) + parity_bit) % 2 == 0
 
     ##--------------------------------------------------------------------------
-    def _is_leap_year(self, year):
+    def _is_leap_year(self, year: int) -> bool:
+        """Prüft, ob ein Jahr ein Schaltjahr ist.
+
+        Parameter
+        ---------
+        * year: Kalenderjahr
+
+        Returns
+        -------
+        * bool: True bei Schaltjahr
+        """
         return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
 
     ##--------------------------------------------------------------------------
-    def _days_in_month(self, year, month):
+    def _days_in_month(self, year: int, month: int) -> int:
+        """Gibt die Anzahl Tage eines Monats zurück.
+
+        Parameter
+        ---------
+        * year: Kalenderjahr
+        * month: Monat 1..12
+
+        Returns
+        -------
+        * int: Anzahl Tage im Monat
+        """
         if month == 2:
             return 29 if self._is_leap_year(year) else 28
         if month in (4, 6, 9, 11):
@@ -63,8 +133,19 @@ class DCF77:
         return 31
 
     ##--------------------------------------------------------------------------
-    def _weekday_dcf_from_date(self, year, month, day):
-        """Berechne DCF-Wochentag: 1=Mo..7=So."""
+    def _weekday_dcf_from_date(self, year: int, month: int, day: int) -> int:
+        """Berechnet den DCF-Wochentag aus einem Datum.
+
+        Parameter
+        ---------
+        * year: Kalenderjahr
+        * month: Monat 1..12
+        * day: Tag 1..31
+
+        Returns
+        -------
+        * int: Wochentag im DCF-Format (1=Mo..7=So)
+        """
         # Sakamoto-Algorithmus: 0=So..6=Sa
         month_table = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
         y = year
@@ -76,8 +157,13 @@ class DCF77:
         return weekday_sun0
 
     ##--------------------------------------------------------------------------
-    def _select_telegram_bits(self):
-        """Nimm bevorzugt die letzten 59, sonst letzten 58 Bits aus dem Buffer."""
+    def _select_telegram_bits(self) -> "list | None":
+        """Wählt ein Telegrammfenster aus dem Bitpuffer.
+
+        Returns
+        -------
+        * list: Letzte 59 bzw. 58 Bits oder None
+        """
         if len(self.bits) >= 59:
             return self.bits[-59:]
         if len(self.bits) >= 58:
@@ -85,13 +171,33 @@ class DCF77:
         return None
 
     ##--------------------------------------------------------------------------
-    def print(self, *args, end="\n"):
+    def printv(self, *args: object, end: str = "\n") -> None:
+        """Gibt Debug-Text nur im Verbose-Modus aus.
+
+        Parameter
+        ---------
+        * args: Beliebige Druckargumente
+        * end: Zeilenende
+
+        Returns
+        -------
+        * None
+        """
         if self.verbose:
             print(*args, end=end)
 
     ##--------------------------------------------------------------------------
-    def _decode_telegram(self, frame_bits):  # noqa: C901
-        """Dekodiere ein Telegramm-Frame zu (Y, M, D, WD, HH, MM, SS, 0)."""
+    def _decode_telegram(self, frame_bits: "list | None") -> "tuple | None":  # noqa: C901
+        """Dekodiert ein DCF77-Frame in ein Datum/Zeit-Tupel.
+
+        Parameter
+        ---------
+        * frame_bits: Telegramm-Bits (58 oder 59 Bits)
+
+        Returns
+        -------
+        * tuple: (year, month, day, weekday, hour, minute, second) oder None
+        """
         try:
             if frame_bits is None or len(frame_bits) < 58:
                 return None
@@ -152,11 +258,17 @@ class DCF77:
             return None
 
     ##--------------------------------------------------------------------------
-    async def run(self):  # noqa: C901
-        print(f"DCF77 Background Task gestartet ({self.pin})...")
+    async def run(self) -> None:  # noqa: C901
+        """Startet die kontinuierliche DCF77-Decoder-Schleife.
+
+        Returns
+        -------
+        * None
+        """
+        print(f"DCF77 Background Task gestartet ({self.dcf_pin})...")
 
         while True:
-            current_state = self.pin.value()
+            current_state = self.dcf_pin.value()
             ## Bei jeder Änderung (auch instabil) Zeitstempel merken
             ## (Wichtig, damit der Filter "von vorne" anfängt zu zählen)
             now = time.ticks_ms()
@@ -169,14 +281,15 @@ class DCF77:
 
                     ## FALLENDE FLANKE (LOW): Ein neuer Puls beginnt
                     if self.last_stable_state == 0:
-                        self.led.value(1)   # LED AN
+                        if self.led:
+                            self.led.value(1)   # LED AN
 
                         ## Prüfen, ob die Pause davor die Minutenmarke war
                         if time.ticks_diff(now, self.last_pulse_end) > 1700:
-                            self.print("*", end="")
+                            self.printv("*", end="")
                             self._line_open = True
                             self.flush_output_line()
-                            self.print(f"--- Minute vollständig ({len(self.bits)} Bits). ---")
+                            self.printv(f"--- Minute vollständig ({len(self.bits)} Bits). ---")
                             frame = self._select_telegram_bits()
                             self.current_time = self._decode_telegram(frame)
                             if self.current_time:
@@ -185,24 +298,25 @@ class DCF77:
                                     try:
                                         self.on_sync(self.current_time)
                                     except Exception as e:
-                                        self.print("on_sync Fehler:", e)
+                                        self.printv("on_sync Fehler:", e)
                             self.bits = [] # Buffer leeren für neue Minute
                         self.pulse_start_time = now
 
                     ## STEIGENDE FLANKE (HIGH): Ein Puls endet
                     else:
-                        self.led.value(0)    # LED AUS
+                        if self.led:
+                            self.led.value(0)    # LED AUS
 
                         pulse_dur = time.ticks_diff(now, self.pulse_start_time)
                         self.last_pulse_end = now
 
                         if 70 < pulse_dur < 150:
                             self.bits.append(0)
-                            self.print("0", end="")
+                            self.printv("0", end="")
                             self._line_open = True
                         elif 170 < pulse_dur < 280:
                             self.bits.append(1)
-                            self.print("1", end="")
+                            self.printv("1", end="")
                             self._line_open = True
 
                         ## Buffer begrenzen, falls Minutenmarke mehrfach nicht erkannt wurde.
@@ -211,13 +325,13 @@ class DCF77:
 
                         ## Alle 10 Bits ein Leerzeichen für die Lesbarkeit
                         if len(self.bits) % 10 == 0:
-                            self.print(" ", end="")
+                            self.printv(" ", end="")
                             self._line_open = True
             else:
                 self.last_change_time = now
 
             ## Kurze Pause, um anderen Tasks Zeit zu geben
-            await asyncio.sleep_ms(5)
+            await asyncio.sleep_ms(5)  # type: ignore[attr-defined]
 
 
 ##******************************************************************************
@@ -225,11 +339,28 @@ class DCF77:
 if __name__ == "__main__":
 
     ## Beispiel für die Integration in main.py
-    def handle_sync(sync_time):
+    def handle_sync(sync_time: tuple) -> None:
+        """Beispiel-Callback für erfolgreiche DCF-Synchronisation.
+
+        Parameter
+        ---------
+        * sync_time: Synchronisierte Zeit als Tupel
+
+        Returns
+        -------
+        * None
+        """
         print(f"[SYNC SUCCESS] Zeit: {sync_time}")
 
-    async def main():
-        dcf = DCF77(pin_no=13, on_sync=handle_sync, verbose=True)
+    async def main() -> None:
+        """Startet den DCF77-Testlauf.
+
+        Returns
+        -------
+        * None
+        """
+        dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+        dcf = DCF77(dcf_pin=dcf_pin, on_sync=handle_sync, verbose=True)
 
         ## Task im Hintergrund starten
         asyncio.create_task(dcf.run())

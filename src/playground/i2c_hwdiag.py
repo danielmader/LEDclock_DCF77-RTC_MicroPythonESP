@@ -3,11 +3,25 @@ Hardware-Diagnose: I2C-Pin-Konfiguration testen
 Versucht verschiedene Pin-Setups, um das ENODEV-Problem zu isolieren.
 """
 import time
-import machine  # type: ignore
+
+import machine
 
 
-def test_pin_config(sda_pin_no, scl_pin_no, freq, description, use_in_flag=True):
-    """Testet eine spezifische Pin-Konfiguration."""
+def test_pin_config(sda_pin_no: int, scl_pin_no: int, freq: int, description: str, use_in_flag: bool = True) -> bool:
+    """Testet eine spezifische I2C-Pin-Konfiguration.
+
+    Parameter
+    ---------
+    * sda_pin_no: GPIO-Nummer für SDA
+    * scl_pin_no: GPIO-Nummer für SCL
+    * freq: I2C-Frequenz in Hertz
+    * description: Beschreibender Name des Tests
+    * use_in_flag: True für IN+PULL_UP, False für OPEN_DRAIN
+
+    Returns
+    -------
+    * bool: True bei erfolgreichem Zugriff auf RTC-Register
+    """
     print(f"\n{'='*60}")
     print(f"Test: {description}")
     print(f"  Pins: SDA=GPIO{sda_pin_no}, SCL=GPIO{scl_pin_no}, Freq={freq}Hz")
@@ -30,7 +44,7 @@ def test_pin_config(sda_pin_no, scl_pin_no, freq, description, use_in_flag=True)
         print(f"  ✓ Scan OK: {[hex(d) for d in devices]}")
 
         if 0x51 not in devices:
-            print(f"  ❌ 0x51 nicht gefunden")
+            print("  ❌ 0x51 nicht gefunden!")
             return False
 
         # Versuche Lesezugriff

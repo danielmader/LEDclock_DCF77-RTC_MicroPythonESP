@@ -9,7 +9,17 @@ dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
 
 ##==============================================================================
 class DCFReceiver:
-    def __init__(self, pin):
+    def __init__(self, pin: machine.Pin) -> None:
+        """Initialisiert den IRQ-basierten DCF-Pulsdetektor.
+
+        Parameter
+        ---------
+        * pin: Eingangspin für DCF77
+
+        Returns
+        -------
+        * None
+        """
         self.pin = pin
         self.last_tick = time.ticks_ms()
         self.pulse_width = 0
@@ -18,7 +28,17 @@ class DCFReceiver:
         ## Interrupt bei JEDER Flankenänderung
         self.pin.irq(handler=self.irq_handler, trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING)
 
-    def irq_handler(self, pin):
+    def irq_handler(self, pin: machine.Pin) -> None:
+        """Verarbeitet Pin-Flanken und ermittelt Pulsbreiten.
+
+        Parameter
+        ---------
+        * pin: Auslösender Pin
+
+        Returns
+        -------
+        * None
+        """
         now = time.ticks_ms()
         diff = time.ticks_diff(now, self.last_tick)
         self.last_tick = now
@@ -44,7 +64,13 @@ dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
 dcf = DCFReceiver(dcf_pin)
 
 
-async def monitor_dcf():
+async def monitor_dcf() -> None:
+    """Gibt erkannte DCF-Pulse als Bits aus.
+
+    Returns
+    -------
+    * None
+    """
     print("Suche DCF77 Signal... Bitte warten (Antenne ausrichten!)")
     while True:
         if dcf.new_pulse:
@@ -58,10 +84,16 @@ async def monitor_dcf():
             else:
                 print(f"? Störung/Pause: {w}ms")
 
-        await asyncio.sleep_ms(10)
+        await asyncio.sleep_ms(10)  # type: ignore[attr-defined]
 
 
-async def main():
+async def main() -> None:
+    """Startet den DCF-Monitor im Event-Loop.
+
+    Returns
+    -------
+    * None
+    """
     print("System-Boot... Starte Tasks.")
 
     ## Alle Tasks gleichzeitig starten

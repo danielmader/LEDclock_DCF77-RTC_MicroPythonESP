@@ -1,8 +1,8 @@
 import time
 
-import framebuf  # type: ignore
-import machine  # type: ignore
-import max7219  # type: ignore
+import framebuf
+import machine
+import max7219
 
 from characters import FONT_3X5, FONT_5x7
 
@@ -25,10 +25,35 @@ power_pin = machine.Pin(0, machine.Pin.OUT)
 
 ##==============================================================================
 class Max7219Matrix(max7219.Matrix8x8):
-    def __init__(self, spi, cs, num_modules=4, power_pin=None):
+    def __init__(
+        self,
+        spi: machine.SPI,
+        cs: machine.Pin,
+        num_modules: int = 4,
+        power_pin: "machine.Pin | None" = None,
+        modules_per_row: "int | None" = None,
+    ) -> None:
+        """Initialisiert die MAX7219-Matrix.
+
+        Parameter
+        ---------
+        * spi: Konfiguriertes SPI-Objekt
+        * cs: Chip-Select-Pin
+        * num_modules: Anzahl kaskadierter 8x8-Module
+        * power_pin: Optionaler GPIO zum Schalten der Versorgung
+        * modules_per_row: Anzahl Module pro physischer Zeile; Standard ist alle Module in einer Zeile
+
+        Returns
+        -------
+        * None
+        """
         self.spi = spi
         self.cs = cs
         self.num_modules = num_modules
+        self.modules_per_row = num_modules if modules_per_row is None else modules_per_row
+
+        if self.modules_per_row <= 0 or self.num_modules % self.modules_per_row != 0:
+            raise ValueError("modules_per_row muss ein positiver Teiler von num_modules sein")
 
         self.power_pin = power_pin
         self.brightness_level = 8  # Standard-Helligkeit (0-15)
@@ -46,7 +71,46 @@ class Max7219Matrix(max7219.Matrix8x8):
         self.show()
 
     ##--------------------------------------------------------------------------
-    def draw_icon(self, data, x_pos, y_pos):
+    def get_row_width(self) -> int:
+        """Gibt die Breite einer physischen Display-Zeile in Pixeln zurück.
+
+        Returns
+        -------
+        * int: Zeilenbreite in Pixeln
+        """
+        return self.modules_per_row * 8
+
+    ##--------------------------------------------------------------------------
+    def get_row_x_offset(self, row: int = 0) -> int:
+        """Gibt den X-Offset einer physischen Display-Zeile zurück.
+
+        Parameter
+        ---------
+        * row: Physische Zeile, beginnend bei 0
+
+        Returns
+        -------
+        * int: X-Offset der Zeile in Pixeln
+        """
+        row_count = self.num_modules // self.modules_per_row
+        if not (0 <= row < row_count):
+            raise ValueError("row liegt außerhalb der konfigurierten Display-Zeilen")
+        return row * self.get_row_width()
+
+    ##--------------------------------------------------------------------------
+    def draw_icon(self, data: bytearray, x_pos: int, y_pos: int) -> None:
+        """Zeichnet ein 8x8-Icon an der angegebenen Position.
+
+        Parameter
+        ---------
+        * data: 8x8-Monobitmap im MONO_VLSB-Format
+        * x_pos: Ziel-X-Position
+        * y_pos: Ziel-Y-Position
+
+        Returns
+        -------
+        * None
+        """
         ## Erstellt einen temporären Buffer für das 8x8 Icon
         fb = framebuf.FrameBuffer(data, 8, 8, framebuf.MONO_VLSB)
         ## Kopiert (blit) das Icon an die gewünschte Stelle auf dem Hauptdisplay
@@ -54,12 +118,18 @@ class Max7219Matrix(max7219.Matrix8x8):
         self.show()
 
     ##--------------------------------------------------------------------------
-    def clear_display(self):
+    def clear_display(self) -> None:
+        """Löscht den Display-Inhalt.
+
+        Returns
+        -------
+        * None
+        """
         self.fill(0)
         self.show()
 
     ##--------------------------------------------------------------------------
-    def _draw_glyph(self, ch, x, y, font_dict):
+    def _draw_glyph(self, ch: str, x: int, y: int, font_dict: "dict | str | None") -> None:
         """
         Generalisierte Glyphen-Zeichnungsfunktion für beliebige Fontgrößen.
 
@@ -70,7 +140,14 @@ class Max7219Matrix(max7219.Matrix8x8):
         * y: Y-Position auf dem Display
         * font_dict: Font-Dictionary mit "_meta_" und Glyph-Einträgen
             Format: {"_meta_": {"width": w, "height": h}, "A": (...), ...}
+
+        Returns
+        -------
+        * None
         """
+        if not isinstance(font_dict, dict):
+            return
+
         meta = font_dict.get("_meta_", {})
         height = meta.get("height", 5)
 
@@ -91,8 +168,17 @@ class Max7219Matrix(max7219.Matrix8x8):
 
     ##--------------------------------------------------------------------------
     @staticmethod
-    def _bit_length_fallback(value):
-        """MicroPython-kompatible Bitlängen-Berechnung ohne int.bit_length()."""
+    def _bit_length_fallback(value: int) -> int:
+        """MicroPython-kompatible Bitlängen-Berechnung ohne int.bit_length().
+
+        Parameter
+        ---------
+        * value: Ganzzahlwert
+
+        Returns
+        -------
+        * int: Anzahl gesetzter Bit-Positionen bis zum höchsten 1-Bit
+        """
         bits = 0
         while value:
             bits += 1
@@ -101,8 +187,17 @@ class Max7219Matrix(max7219.Matrix8x8):
 
     ##--------------------------------------------------------------------------
     @staticmethod
-    def _trailing_zeros_fallback(value):
-        """Anzahl nachlaufender Nullen im Binärmuster (LSB-seitig)."""
+    def _trailing_zeros_fallback(value: int) -> int:
+        """Anzahl nachlaufender Nullen im Binärmuster (LSB-seitig).
+
+        Parameter
+        ---------
+        * value: Ganzzahlwert
+
+        Returns
+        -------
+        * int: Anzahl LSB-seitiger 0-Bits
+        """
         if value == 0:
             return 0
         zeros = 0
@@ -112,8 +207,21 @@ class Max7219Matrix(max7219.Matrix8x8):
         return zeros
 
     ##--------------------------------------------------------------------------
-    def _get_glyph_bit_span(self, ch, font_dict):
-        """Liefert genutzten Bitbereich einer Glyph als (min_bit, max_bit, span_width)."""
+    def _get_glyph_bit_span(self, ch: str, font_dict: "dict | str | None") -> tuple:
+        """Liefert den genutzten Bitbereich einer Glyph.
+
+        Parameter
+        ---------
+        * ch: Zu analysierendes Zeichen
+        * font_dict: Font-Dictionary mit Metadaten und Glyphen
+
+        Returns
+        -------
+        * tuple: (min_bit, max_bit, span_width)
+        """
+        if not isinstance(font_dict, dict):
+            return 0, 0, 0
+
         meta = font_dict.get("_meta_", {})
         default_width = meta.get("width", 3)
         space_width = meta.get("space_width", 1)
@@ -138,14 +246,35 @@ class Max7219Matrix(max7219.Matrix8x8):
         return min_bit, max_bit, min(default_width, span_width)
 
     ##--------------------------------------------------------------------------
-    def _get_glyph_effective_width(self, ch, font_dict):
-        """Ermittelt die effektive Zeichenbreite aus dem genutzten Bitbereich der Glyph."""
+    def _get_glyph_effective_width(self, ch: str, font_dict: "dict | str | None") -> int:
+        """Ermittelt die effektive Zeichenbreite aus dem genutzten Bitbereich.
+
+        Parameter
+        ---------
+        * ch: Zu analysierendes Zeichen
+        * font_dict: Font-Dictionary mit Metadaten und Glyphen
+
+        Returns
+        -------
+        * int: Effektive Breite in Pixeln
+        """
         _, _, span_width = self._get_glyph_bit_span(ch, font_dict)
         return span_width
 
     ##--------------------------------------------------------------------------
-    def get_text_width(self, text, font_dict="builtin", spacing=1):
-        """Berechnet die Pixelbreite eines Textes für den gewählten Font."""
+    def get_text_width(self, text: str, font_dict: "dict | str | None" = "builtin", spacing: int = 1) -> int:
+        """Berechnet die Pixelbreite eines Textes für den gewählten Font.
+
+        Parameter
+        ---------
+        * text: Eingabetext
+        * font_dict: Font-Dictionary oder "builtin"
+        * spacing: Zeichenabstand in Pixeln
+
+        Returns
+        -------
+        * int: Gesamte Textbreite in Pixeln
+        """
         if font_dict is None or font_dict == "builtin":
             return len(text) * 8
 
@@ -161,23 +290,69 @@ class Max7219Matrix(max7219.Matrix8x8):
         return max(0, width - spacing)
 
     ##--------------------------------------------------------------------------
-    def get_centered_x(self, text, font_dict="builtin", spacing=1, clamp=False):
-        """Berechnet die zentrierte Start-X-Position für den Text."""
-        display_width = self.num_modules * 8
+    def get_centered_x(
+        self,
+        text: str,
+        font_dict: "dict | str | None" = "builtin",
+        spacing: int = 1,
+        clamp: bool = False,
+        row: int = 0,
+    ) -> int:
+        """Berechnet die zentrierte Start-X-Position für den Text.
+
+        Parameter
+        ---------
+        * text: Eingabetext
+        * font_dict: Font-Dictionary oder "builtin"
+        * spacing: Zeichenabstand in Pixeln
+        * clamp: Begrenzt negative X-Positionen auf 0
+        * row: Physische Display-Zeile, auf der zentriert werden soll
+
+        Returns
+        -------
+        * int: Startposition für zentriertes Rendering
+        """
+        display_width = self.get_row_width()
         text_width = self.get_text_width(text, font_dict, spacing)
         x_pos = (display_width - text_width) // 2
-        return max(0, x_pos) if clamp else x_pos
+        if clamp:
+            x_pos = max(0, x_pos)
+        return self.get_row_x_offset(row) + x_pos
 
     ##--------------------------------------------------------------------------
-    def write_text_centered(self, text, y, font_dict="builtin", spacing=1, clamp=False, clear=True):
-        """Schreibt einen Text horizontal zentriert."""
-        x_pos = self.get_centered_x(text, font_dict, spacing, clamp)
+    def write_text_centered(
+        self,
+        text: str,
+        y: int,
+        font_dict: "dict | str | None" = "builtin",
+        spacing: int = 1,
+        clamp: bool = False,
+        clear: bool = True,
+        row: int = 0,
+    ) -> None:
+        """Schreibt einen Text horizontal zentriert.
+
+        Parameter
+        ---------
+        * text: Auszugebender Text
+        * y: Ziel-Y-Position
+        * font_dict: Font-Dictionary oder "builtin"
+        * spacing: Zeichenabstand in Pixeln
+        * clamp: Begrenzt negative X-Positionen auf 0
+        * clear: Löscht das Display vor dem Schreiben
+        * row: Physische Display-Zeile, auf der geschrieben werden soll
+
+        Returns
+        -------
+        * None
+        """
+        x_pos = self.get_centered_x(text, font_dict, spacing, clamp, row)
         if clear:
             self.fill(0)
         self.write_text(text, x_pos, y, font_dict, spacing)
 
     ##--------------------------------------------------------------------------
-    def write_text(self, text, x, y, font_dict="builtin", spacing=1):
+    def write_text(self, text: str, x: int, y: int, font_dict: "dict | str | None" = "builtin", spacing: int = 1) -> None:
         """
         Schreibt Text mit dem angegebenen Font.
 
@@ -188,6 +363,11 @@ class Max7219Matrix(max7219.Matrix8x8):
         * y: Y-Position
         * font_dict: Font-Dictionary oder "builtin" für FrameBuffer-Standardfont (default: "builtin")
             Beispiele: FONT_3X5, FONT_5x7, oder "builtin"
+        * spacing: Zeichenabstand in Pixeln
+
+        Returns
+        -------
+        * None
         """
         ## FrameBuffer-Standardfont verwenden
         if font_dict is None or font_dict == "builtin":
@@ -201,7 +381,14 @@ class Max7219Matrix(max7219.Matrix8x8):
         self.show()
 
     ##--------------------------------------------------------------------------
-    def write_scrolling_text(self, text, y, font_dict="builtin", speed_s=0.05, spacing=1):
+    def write_scrolling_text(
+        self,
+        text: str,
+        y: int,
+        font_dict: "dict | str | None" = "builtin",
+        speed_s: float = 0.05,
+        spacing: int = 1,
+    ) -> None:
         """Scrollt Text mit dem angegebenen Font über die Matrix.
 
         Parameter
@@ -211,6 +398,11 @@ class Max7219Matrix(max7219.Matrix8x8):
         * font_dict: Font-Dictionary oder "builtin" für FrameBuffer-Standardfont (default: "builtin")
                 Beispiele: FONT_3X5, FONT_5x7, oder "builtin"
         * speed_s: Verzögerung zwischen Frames in Sekunden
+        * spacing: Zeichenabstand in Pixeln
+
+        Returns
+        -------
+        * None
         """
         ## FrameBuffer-Standardfont verwenden
         if font_dict is None or font_dict == "builtin":
@@ -231,20 +423,64 @@ class Max7219Matrix(max7219.Matrix8x8):
                 time.sleep(speed_s)
 
     ##--- Aliase für häufig verwendete Fonts ----------------------------------
-    def write_text_small(self, text, x, y):
-        """Schreibt Text in kleiner 3x5-Schrift."""
+    def write_text_small(self, text: str, x: int, y: int) -> None:
+        """Schreibt Text in kleiner 3x5-Schrift.
+
+        Parameter
+        ---------
+        * text: Auszugebender Text
+        * x: Ziel-X-Position
+        * y: Ziel-Y-Position
+
+        Returns
+        -------
+        * None
+        """
         self.write_text(text, x, y, FONT_3X5)
 
-    def write_scrolling_text_small(self, text, y, speed_s=0.05):
-        """Scrollt Text in kleiner 3x5-Schrift."""
+    def write_scrolling_text_small(self, text: str, y: int, speed_s: float = 0.05) -> None:
+        """Scrollt Text in kleiner 3x5-Schrift.
+
+        Parameter
+        ---------
+        * text: Auszugebender Text
+        * y: Ziel-Y-Position
+        * speed_s: Verzögerung zwischen Frames in Sekunden
+
+        Returns
+        -------
+        * None
+        """
         self.write_scrolling_text(text, y, FONT_3X5, speed_s)
 
-    def write_text_compact(self, text, x, y):
-        """Schreibt Text in kompakter 5x7-Schrift."""
+    def write_text_compact(self, text: str, x: int, y: int) -> None:
+        """Schreibt Text in kompakter 5x7-Schrift.
+
+        Parameter
+        ---------
+        * text: Auszugebender Text
+        * x: Ziel-X-Position
+        * y: Ziel-Y-Position
+
+        Returns
+        -------
+        * None
+        """
         self.write_text(text, x, y, FONT_5x7)
 
-    def write_scrolling_text_compact(self, text, y, speed_s=0.05):
-        """Scrollt Text in kompakter 5x7-Schrift."""
+    def write_scrolling_text_compact(self, text: str, y: int, speed_s: float = 0.05) -> None:
+        """Scrollt Text in kompakter 5x7-Schrift.
+
+        Parameter
+        ---------
+        * text: Auszugebender Text
+        * y: Ziel-Y-Position
+        * speed_s: Verzögerung zwischen Frames in Sekunden
+
+        Returns
+        -------
+        * None
+        """
         self.write_scrolling_text(text, y, FONT_5x7, speed_s)
 
 
@@ -294,7 +530,7 @@ if __name__ == "__main__":
 
         ## 4) Demo mit kompakter 5x7-Schrift (größere Ziffern für Uhranzeige)
         display.fill(0)
-        display.write_text_centerned("12:45%°", 1, FONT_5x7)
+        display.write_text_centered("12:45%°", 1, FONT_5x7)
         time.sleep(2)
         display.fill(0)
         display.write_text_centered("22.1°  50%", 1, FONT_3X5)

@@ -1,7 +1,24 @@
 ## VSCode
 *.code-workspace
 
+*.directory
+# *Verknüpfung.lnk
 
+## Large files / non-copyright-free data
+dependencies/
+issues/
+tools/
+datasheets*/
+Datenblätter/
+Examples/
+FW/
+
+## Credentials
+creds.py
+secrets.py
+settings.toml
+
+## --- Python .gitignore template ----------------------------------------------
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

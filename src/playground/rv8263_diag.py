@@ -7,14 +7,33 @@ import time
 import machine  # type: ignore
 
 
-def hex_dump(data, label="Data"):
-    """Druckt Bytes in hexadezimal aus."""
+def hex_dump(data: bytes, label: str = "Data") -> None:
+    """Druckt Bytes in hexadezimal aus.
+
+    Parameter
+    ---------
+    * data: Bytefolge zur Ausgabe
+    * label: Präfix vor dem Dump
+
+    Returns
+    -------
+    * None
+    """
     hex_str = " ".join(f"{b:02x}" for b in data)
     print(f"{label}: [{hex_str}]")
 
 
-def scan_and_diagnose(freq=50000):
-    """Scannt den I2C-Bus und diagnostiziert 0x51."""
+def scan_and_diagnose(freq: int = 50000) -> bool:  # noqa: C901
+    """Scannt den I2C-Bus und diagnostiziert das Gerät auf 0x51.
+
+    Parameter
+    ---------
+    * freq: I2C-Frequenz in Hertz
+
+    Returns
+    -------
+    * bool: True, wenn der Grundzugriff auf 0x51 möglich war
+    """
     print(f"\n=== I²C-Diagnose bei {freq} Hz ===")
 
     sda_pin = machine.Pin(23, machine.Pin.IN, machine.Pin.PULL_UP)

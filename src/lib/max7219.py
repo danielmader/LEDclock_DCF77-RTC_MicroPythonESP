@@ -36,7 +36,7 @@ _SHUTDOWN = const(12)
 _DISPLAYTEST = const(15)
 
 class Matrix8x8:
-    def __init__(self, spi, cs, num):
+    def __init__(self, spi: object, cs: object, num: int) -> None:
         """
         Driver for cascading MAX7219 8x8 LED matrices.
 
@@ -47,6 +47,18 @@ class Matrix8x8:
         >>> display.text('1234',0,0,1)
         >>> display.show()
 
+        Parameters
+        ----------
+        spi : object
+            Initialized SPI object.
+        cs : object
+            Chip-select pin object.
+        num : int
+            Number of cascaded 8x8 modules.
+
+        Returns
+        -------
+        None
         """
         self.spi = spi
         self.cs = cs
@@ -70,13 +82,32 @@ class Matrix8x8:
         self.blit = fb.blit  # (fbuf, x, y[, key])
         self.init()
 
-    def _write(self, command, data):
+    def _write(self, command: int, data: int) -> None:
+        """Writes one command/data pair to all cascaded modules.
+
+        Parameters
+        ----------
+        command : int
+            MAX7219 register command.
+        data : int
+            Value to write to the register.
+
+        Returns
+        -------
+        None
+        """
         self.cs(0)
         for m in range(self.num):
             self.spi.write(bytearray([command, data]))
         self.cs(1)
 
-    def init(self):
+    def init(self) -> None:
+        """Initializes MAX7219 configuration registers.
+
+        Returns
+        -------
+        None
+        """
         for command, data in (
             (_SHUTDOWN, 0),
             (_DISPLAYTEST, 0),
@@ -86,12 +117,29 @@ class Matrix8x8:
         ):
             self._write(command, data)
 
-    def brightness(self, value):
+    def brightness(self, value: int) -> None:
+        """Sets display brightness.
+
+        Parameters
+        ----------
+        value : int
+            Brightness level in range 0..15.
+
+        Returns
+        -------
+        None
+        """
         if not 0 <= value <= 15:
             raise ValueError("Brightness out of range")
         self._write(_INTENSITY, value)
 
-    def show(self):
+    def show(self) -> None:
+        """Flushes the frame buffer to the physical display.
+
+        Returns
+        -------
+        None
+        """
         for y in range(8):
             self.cs(0)
             for m in range(self.num):

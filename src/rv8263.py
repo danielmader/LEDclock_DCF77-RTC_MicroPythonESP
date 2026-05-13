@@ -1,11 +1,20 @@
 import time
 
-import machine  # type: ignore
+import machine
 
 
 ##==============================================================================
-def bcd_to_dec(bcd):
-    """Konvertiert Binary Coded Decimal zu Dezimal."""
+def bcd_to_dec(bcd: int) -> int:
+    """Konvertiert Binary Coded Decimal zu Dezimal.
+
+    Parameter
+    ---------
+    * bcd: BCD-codierter Bytewert
+
+    Returns
+    -------
+    * int: Dezimalwert
+    """
     return (bcd // 16) * 10 + (bcd % 16)
 
 # bcd_to_dec(0x25)  # Beispiel: 0x25 (BCD) -> 25 (Dezimal)
@@ -13,8 +22,17 @@ def bcd_to_dec(bcd):
 
 
 ##==============================================================================
-def dec_to_bcd(dec):
-    """Konvertiert Dezimal zu Binary Coded Decimal."""
+def dec_to_bcd(dec: int) -> int:
+    """Konvertiert Dezimal zu Binary Coded Decimal.
+
+    Parameter
+    ---------
+    * dec: Dezimalwert
+
+    Returns
+    -------
+    * int: BCD-codierter Bytewert
+    """
     return (dec // 10) << 4 | (dec % 10)
 
 # dec_to_bcd(25)  # Beispiel: 25 (Dezimal) -> 0x25 (BCD)
@@ -95,37 +113,93 @@ class RV8263:
 
     ##--------------------------------------------------------------------------
     @staticmethod
-    def rv_weekday_to_machine(rv_weekday):
-        """RV: 0=So..6=Sa -> MicroPython: 0=Mo..6=So."""
+    def rv_weekday_to_machine(rv_weekday: int) -> int:
+        """Wandelt RV-Wochentag in MicroPython-Format um.
+
+        Parameter
+        ---------
+        * rv_weekday: Wochentag im RV-Format (0=So..6=Sa)
+
+        Returns
+        -------
+        * int: Wochentag im MicroPython-Format (0=Mo..6=So)
+        """
         return (rv_weekday + 6) % 7
 
     ##--------------------------------------------------------------------------
     @staticmethod
-    def machine_weekday_to_rv(machine_weekday):
-        """MicroPython: 0=Mo..6=So -> RV: 0=So..6=Sa."""
+    def machine_weekday_to_rv(machine_weekday: int) -> int:
+        """Wandelt MicroPython-Wochentag in RV-Format um.
+
+        Parameter
+        ---------
+        * machine_weekday: Wochentag im MicroPython-Format (0=Mo..6=So)
+
+        Returns
+        -------
+        * int: Wochentag im RV-Format (0=So..6=Sa)
+        """
         return (machine_weekday + 1) % 7
 
     ##--------------------------------------------------------------------------
     @staticmethod
-    def dcf_weekday_to_rv(dcf_weekday):
-        """DCF77: 1=Mo..7=So -> RV: 0=So..6=Sa."""
+    def dcf_weekday_to_rv(dcf_weekday: int) -> int:
+        """Wandelt DCF77-Wochentag in RV-Format um.
+
+        Parameter
+        ---------
+        * dcf_weekday: Wochentag im DCF-Format (1=Mo..7=So)
+
+        Returns
+        -------
+        * int: Wochentag im RV-Format (0=So..6=Sa)
+        """
         return dcf_weekday % 7
 
     ##--------------------------------------------------------------------------
     @staticmethod
-    def dcf_weekday_to_machine(dcf_weekday):
-        """DCF77: 1=Mo..7=So -> MicroPython: 0=Mo..6=So."""
+    def dcf_weekday_to_machine(dcf_weekday: int) -> int:
+        """Wandelt DCF77-Wochentag in MicroPython-Format um.
+
+        Parameter
+        ---------
+        * dcf_weekday: Wochentag im DCF-Format (1=Mo..7=So)
+
+        Returns
+        -------
+        * int: Wochentag im MicroPython-Format (0=Mo..6=So)
+        """
         return (dcf_weekday - 1) % 7
 
     ##--------------------------------------------------------------------------
-    def __init__(self, i2c):
+    def __init__(self, i2c: machine.I2C) -> None:
+        """Initialisiert die RV-8263-Instanz.
+
+        Parameter
+        ---------
+        * i2c: Initialisierter I2C-Bus
+
+        Returns
+        -------
+        * None
+        """
         self.i2c = i2c
         if not self.scan_bus():
             raise Exception(f"RTC 'RV-8263' nicht gefunden auf Adresse {hex(self.RTC_ADDR)}")
 
     ##--------------------------------------------------------------------------
-    def _read_regs(self, reg, length):
-        """Liest Register robust, mit Fallback fuer Controller ohne readfrom_mem-Support."""
+    def _read_regs(self, reg: int, length: int) -> bytes:
+        """Liest RTC-Register robust mit Fallback-Strategie.
+
+        Parameter
+        ---------
+        * reg: Startregister
+        * length: Anzahl zu lesender Bytes
+
+        Returns
+        -------
+        * bytes: Gelesene Registerdaten
+        """
         last_exc = None
         for _ in range(self.I2C_RETRIES):
             try:
@@ -144,8 +218,18 @@ class RV8263:
         raise OSError("RTC Lesezugriff fehlgeschlagen")
 
     ##--------------------------------------------------------------------------
-    def _write_regs(self, reg, data):
-        """Schreibt Register robust, mit Fallback fuer Controller ohne writeto_mem-Support."""
+    def _write_regs(self, reg: int, data: bytes) -> None:
+        """Schreibt RTC-Register robust mit Fallback-Strategie.
+
+        Parameter
+        ---------
+        * reg: Startregister
+        * data: Zu schreibende Nutzdaten
+
+        Returns
+        -------
+        * None
+        """
         last_exc = None
         for _ in range(self.I2C_RETRIES):
             try:
@@ -165,7 +249,13 @@ class RV8263:
         raise OSError("RTC Schreibzugriff fehlgeschlagen")
 
     ##--------------------------------------------------------------------------
-    def scan_bus(self):
+    def scan_bus(self) -> bool:
+        """Prüft, ob die RTC-Adresse auf dem I2C-Bus erreichbar ist.
+
+        Returns
+        -------
+        * bool: True, wenn die RTC gefunden wurde
+        """
         # print("Scanne I²C Bus...")
         devices = self.i2c.scan()
         if not devices:
@@ -175,7 +265,13 @@ class RV8263:
         return self.RTC_ADDR in devices
 
     ##--------------------------------------------------------------------------
-    def init_rtc(self):
+    def init_rtc(self) -> None:
+        """Initialisiert die RTC-Grundregister.
+
+        Returns
+        -------
+        * None
+        """
         print("Initialisiere RTC...")
         ## Register 0x00 (Control 1) auf 0 -> startet den Oszillator
         ## Register 0x01 (Control 2) auf 0 -> löscht Alarme/Interrupts
@@ -189,7 +285,13 @@ class RV8263:
         # self.i2c.writeto_mem(self.RTC_ADDR, 0x04, b'\x10\x00\x12')
 
     ##--------------------------------------------------------------------------
-    def get_rtc_seconds(self):
+    def get_rtc_seconds(self) -> "int | None":
+        """Liest nur die Sekunden aus der RTC.
+
+        Returns
+        -------
+        * int: Sekundenwert 0..59 oder None bei Fehler
+        """
         ## Register 0x04 ist bei der RV-8263 das Sekunden-Register
         try:
             # data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 1)
@@ -204,8 +306,13 @@ class RV8263:
             return
 
     ##--------------------------------------------------------------------------
-    def get_rtc_time(self):
-        """Liefert Zeit als (Y, M, D, weekday(0=Mo..6=So), h, m, s)."""
+    def get_rtc_time(self) -> "tuple | None":
+        """Liefert Zeit im MicroPython-Wochentagsformat.
+
+        Returns
+        -------
+        * tuple: (Y, M, D, weekday(0=Mo..6=So), h, m, s) oder None
+        """
         now = self.get_rtc_time_rv()
         if now is None:
             return None
@@ -215,8 +322,13 @@ class RV8263:
         return (year, month, date, machine_weekday, hour, minute, second)
 
     ##--------------------------------------------------------------------------
-    def get_rtc_time_rv(self):
-        """Liefert rohe RV-Zeit als (Y, M, D, weekday(0=So..6=Sa), h, m, s)."""
+    def get_rtc_time_rv(self) -> "tuple | None":
+        """Liefert rohe RV-Zeit mit RV-Wochentagsformat.
+
+        Returns
+        -------
+        * tuple: (Y, M, D, weekday(0=So..6=Sa), h, m, s) oder None
+        """
         ## Lese 7 Bytes ab Register 0x04
         try:
             # data = self.i2c.readfrom_mem(self.RTC_ADDR, 0x04, 7)
@@ -241,8 +353,13 @@ class RV8263:
             return
 
     ##--------------------------------------------------------------------------
-    def get_rtc_time_machine(self):
-        """Liefert die Zeit im Format von machine.RTC().datetime()."""
+    def get_rtc_time_machine(self) -> "tuple | None":
+        """Liefert die Zeit im Format von machine.RTC().datetime().
+
+        Returns
+        -------
+        * tuple: (Y, M, D, weekday, h, m, s, subseconds) oder None
+        """
         now = self.get_rtc_time()
         if now is None:
             return None
@@ -251,11 +368,34 @@ class RV8263:
         return (year, month, date, machine_weekday, hour, minute, second, 0)
 
     ##--------------------------------------------------------------------------
-    def set_rtc_time(self, year, month, date, weekday, hours, minutes, seconds):
+    def set_rtc_time(
+        self,
+        year: int,
+        month: int,
+        date: int,
+        weekday: int,
+        hours: int,
+        minutes: int,
+        seconds: int,
+    ) -> None:
         """
         Stellt die Zeit der RV-8263 ein.
         Erwartet weekday im MicroPython-Format (0=Mo..6=So).
         Register: 0x04=Sek, 0x05=Min, 0x06=Std, 0x07=Tag, 0x08=Wochentag, 0x09=Monat, 0x0A=Jahr
+
+        Parameter
+        ---------
+        * year: Jahr vierstellig
+        * month: Monat 1..12
+        * date: Tag 1..31
+        * weekday: Wochentag 0=Mo..6=So
+        * hours: Stunde 0..23
+        * minutes: Minute 0..59
+        * seconds: Sekunde 0..59
+
+        Returns
+        -------
+        * None
         """
         try:
             rv_weekday = self.machine_weekday_to_rv(weekday)
@@ -278,14 +418,47 @@ class RV8263:
             return
 
     ##--------------------------------------------------------------------------
-    def set_rtc_time_rv(self, year, month, date, rv_weekday, hours, minutes, seconds):
-        """Setzt die RTC mit rohem RV-weekday (0=So..6=Sa)."""
+    def set_rtc_time_rv(
+        self,
+        year: int,
+        month: int,
+        date: int,
+        rv_weekday: int,
+        hours: int,
+        minutes: int,
+        seconds: int,
+    ) -> None:
+        """Setzt die RTC mit rohem RV-Wochentag.
+
+        Parameter
+        ---------
+        * year: Jahr vierstellig
+        * month: Monat 1..12
+        * date: Tag 1..31
+        * rv_weekday: Wochentag 0=So..6=Sa
+        * hours: Stunde 0..23
+        * minutes: Minute 0..59
+        * seconds: Sekunde 0..59
+
+        Returns
+        -------
+        * None
+        """
         machine_weekday = self.rv_weekday_to_machine(rv_weekday)
         self.set_rtc_time(year, month, date, machine_weekday, hours, minutes, seconds)
 
     ##--------------------------------------------------------------------------
-    def set_rtc_time_from_machine(self, machine_datetime):
-        """Setzt die RTC aus einem machine.RTC().datetime()-Tupel."""
+    def set_rtc_time_from_machine(self, machine_datetime: tuple) -> None:
+        """Setzt die RTC aus einem machine.RTC().datetime()-Tupel.
+
+        Parameter
+        ---------
+        * machine_datetime: Tupel im Format (Y, M, D, weekday, h, m, s, subsec)
+
+        Returns
+        -------
+        * None
+        """
         year, month, date, machine_weekday, hour, minute, second, _ = machine_datetime
         self.set_rtc_time(year, month, date, machine_weekday, hour, minute, second)
 

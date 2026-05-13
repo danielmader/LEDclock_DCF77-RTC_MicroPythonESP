@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-import machine  # type: ignore
+import machine
 
 ## Zugriff auf die interne Hardware-Uhr
 rtc = machine.RTC()
@@ -9,7 +9,13 @@ rtc = machine.RTC()
 ## Beispiel: Einmalig die Zeit setzen (Jahr, Monat, Tag, Wochentag, Std, Min, Sek, Subsek)
 rtc.datetime((2026, 4, 21, 3, 12, 0, 0, 0))
 
-async def clock_task():
+async def clock_task() -> None:
+    """Gibt die RTC-Zeit taktsynchron im Sekundentakt aus.
+
+    Returns
+    -------
+    * None
+    """
     while True:
         ## Wir holen uns die Zeit direkt aus der Hardware
         t = rtc.datetime()
@@ -19,8 +25,8 @@ async def clock_task():
         ## Berechnen, wie lange wir bis zur nächsten VOLLEN Sekunde warten müssen
         ## Das minimiert das "Wandern" der Anzeige
         current_ms = time.ticks_ms()
-        sleep_time = 1000 - (current_ms % 1000)
-        await asyncio.sleep_ms(sleep_time)
+        sleep_time = 1000 - (current_ms % 1000)  # type: ignore[operator]
+        await asyncio.sleep_ms(sleep_time)  # type: ignore[attr-defined]
 
 
 ##******************************************************************************
