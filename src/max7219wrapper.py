@@ -30,8 +30,10 @@ class Max7219Matrix(max7219.Matrix8x8):
         spi: machine.SPI,
         cs: machine.Pin,
         num_modules: int = 4,
-        power_pin: "machine.Pin | None" = None,
         modules_per_row: "int | None" = None,
+        power_pin: "machine.Pin | None" = None,
+        brightness_level: int = 8,  # Standard-Helligkeit (0-15)
+        **kwargs,
     ) -> None:
         """Initialisiert die MAX7219-Matrix.
 
@@ -40,8 +42,9 @@ class Max7219Matrix(max7219.Matrix8x8):
         * spi: Konfiguriertes SPI-Objekt
         * cs: Chip-Select-Pin
         * num_modules: Anzahl kaskadierter 8x8-Module
-        * power_pin: Optionaler GPIO zum Schalten der Versorgung
         * modules_per_row: Anzahl Module pro physischer Zeile; Standard ist alle Module in einer Zeile
+        * power_pin: Optionaler GPIO zum Schalten der Versorgung
+        * brightness_level: Helligkeit des Displays (0-15)
 
         Returns
         -------
@@ -56,7 +59,7 @@ class Max7219Matrix(max7219.Matrix8x8):
             raise ValueError("modules_per_row muss ein positiver Teiler von num_modules sein")
 
         self.power_pin = power_pin
-        self.brightness_level = 8  # Standard-Helligkeit (0-15)
+        self.brightness_level = brightness_level  # Standard-Helligkeit (0-15)
 
         ## optionale Power-Supply-Schaltung
         if self.power_pin is not None:

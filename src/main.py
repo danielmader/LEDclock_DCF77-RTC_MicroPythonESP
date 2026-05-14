@@ -34,14 +34,22 @@ rtc_external = rv8263.RV8263(i2c)
 rtc_external.init_rtc()
 ## Temperatur- und Luftfeuchtigkeitssensor SHT31
 temphum_sensor = sht31.SHT31(i2c)
+_latest_temp = None
+_latest_hum = None
 
 ## 4) Helligkeitssensor TEMT6000
 adc_pin = machine.Pin(36)
 light_sensor = temt6000.TEMT6000(adc_pin)
+_latest_lux_perc = None
 
 ## 5) DCF77-Sensor
 dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
 dcf = dcf77.DCF77(dcf_pin, led_pin=None)  # Optional: LED an Pin 2 zur Visualisierung der Signalverarbeitung anschließen
+DCF_MIN_YEAR = 2020
+MAX_SYNC_JUMP_SECONDS = 12 * 60 * 60
+DCF_PROGRESS_TOLERANCE_SECONDS = 20
+_last_dcf_candidate = None
+_last_dcf_candidate_ticks = None
 
 ## 6) MAX7219-LED-Matrix (2x 4 Module à 8x8 LEDs = 2x 32x8)
 baudrate = 500000  # 500 kHz für maximale Stabilität bei langen Kabeln oder vielen Modulen
@@ -49,22 +57,11 @@ baudrate = 1000000  # 1 MHz für flüssigere Darstellung
 baudrate = 10000000  # 10 MHz für maximale Performance (nur bei sehr kurzen Kabeln und wenigen Modulen stabil)
 spi = machine.SPI(1, baudrate=baudrate, polarity=0, phase=0, sck=machine.Pin(5), mosi=machine.Pin(19))
 cs = machine.Pin(18, machine.Pin.OUT)
-power_pin = machine.Pin(0, machine.Pin.OUT)
-# display = max7219wrapper.Max7219Matrix(spi, cs, num_modules=4, power_pin=power_pin)
+# power_pin = machine.Pin(0, machine.Pin.OUT)
+power_pin = None  # wenn kein separater Power-Control-Pin vorhanden ist, auf None setzen
 display = max7219wrapper.Max7219Matrix(spi, cs, num_modules=8, power_pin=power_pin, modules_per_row=4)
 
 ## --- Hilfsfunktionen ---------------------------------------------------------
-
-DCF_MIN_YEAR = 2020
-MAX_SYNC_JUMP_SECONDS = 12 * 60 * 60
-DCF_PROGRESS_TOLERANCE_SECONDS = 20
-
-_last_dcf_candidate = None
-_last_dcf_candidate_ticks = None
-_latest_temp = None
-_latest_hum = None
-_latest_lux_perc = None
-
 
 def _is_leap_year(year: int) -> bool:
     """Prüft, ob ein Jahr ein Schaltjahr ist.
@@ -304,8 +301,13 @@ async def read_sensors():
 
         print(f"[SENSORS] {temp:.2f} °C | {hum:.2f} %rF | {lux_perc:.1f} %ADC")
 
-        ## TODO: Anpassung der Display-Helligkeit
-        ## TODO: Anzeige von Temperatur/Luftfeuchtigkeit/Helligkeit auf Display (z.B. im Wechsel mit Uhrzeit oder per Knopfdruck)
+        ## Anpassung der Display-Helligkeit
+        if lux_perc is not None and display is not None:
+            ## Wir skalieren die Helligkeit von 0-40% auf 0-15 (MAX7219-Helligkeitsstufen)
+            brightness = int((lux_perc / 40) * 15)
+            brightness = max(0, min(15, brightness))  # Begrenzung auf gültigen Bereich
+            print(f"[SENSORS] Setze Display-Helligkeit auf {brightness} (für {lux_perc:.1f}% Licht)")
+            display.brightness(brightness)
 
         await asyncio.sleep(5)
 
