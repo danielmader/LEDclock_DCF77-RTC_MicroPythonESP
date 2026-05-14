@@ -45,6 +45,8 @@ dcf = dcf77.DCF77(dcf_pin, led_pin=None)  # Optional: LED an Pin 2 zur Visualisi
 
 ## 6) MAX7219-LED-Matrix (2x 4 Module à 8x8 LEDs = 2x 32x8)
 baudrate = 500000  # 500 kHz für maximale Stabilität bei langen Kabeln oder vielen Modulen
+baudrate = 1000000  # 1 MHz für flüssigere Darstellung
+baudrate = 10000000  # 10 MHz für maximale Performance (nur bei sehr kurzen Kabeln und wenigen Modulen stabil)
 spi = machine.SPI(1, baudrate=baudrate, polarity=0, phase=0, sck=machine.Pin(5), mosi=machine.Pin(19))
 cs = machine.Pin(18, machine.Pin.OUT)
 power_pin = machine.Pin(0, machine.Pin.OUT)
@@ -258,20 +260,20 @@ async def update_display():
         display.clear()
         ## 1a) Anzeige der Uhrzeit im Format "HH:MM:SS"
         # time_str = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
-        ## 1b) Anzeige der Uhrzeit im Format "HH:MM" mit blinkendem Doppelpunkt
+        ## 1b) Anzeige der Uhrzeit im Format "H:MM" mit blinkendem Doppelpunkt
         if now[6] % 2 == 0:
-            time_str = f"{now[4]:02d}:{now[5]:02d}"
+            time_str = f"{now[4]:d}:{now[5]:02d}"
         else:
-            time_str = f"{now[4]:02d} {now[5]:02d}"
+            time_str = f"{now[4]:d} {now[5]:02d}"
         display.write_text_centered(time_str, 1, max7219wrapper.FONT_5X7, row=0)
         ## 2) Sensorwerte auf der zweiten Zeile anzeigen (z.B. Temperatur und Luftfeuchtigkeit)
         if _latest_temp is None or _latest_hum is None:
-            display.write_text_centered("----", 1, max7219wrapper.FONT_3X5, row=1)
+            display.write_text_centered("----", 1, max7219wrapper.FONT_5X7, row=1)
         else:
             if now[6] % 10 < 5:
-                display.write_text_centered(f"{_latest_temp:.1f} °C", 1, max7219wrapper.FONT_3X5, row=1)
+                display.write_text_centered(f"{_latest_temp:.1f} °C", 1, max7219wrapper.FONT_5X7, row=1)
             else:
-                display.write_text_centered(f"{_latest_hum:.1f} %", 1, max7219wrapper.FONT_3X5, row=1)
+                display.write_text_centered(f"{_latest_hum:.1f} %", 1, max7219wrapper.FONT_5X7, row=1)
         ## Neue Anzeige schalten
         display.show()
 
