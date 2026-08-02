@@ -331,7 +331,7 @@ class DCF77:
                 self.last_change_time = now
 
             ## Kurze Pause, um anderen Tasks Zeit zu geben
-            await asyncio.sleep_ms(5)  # type: ignore[attr-defined]
+            await asyncio.sleep_ms(5)
 
 
 ##******************************************************************************

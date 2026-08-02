@@ -28,12 +28,13 @@ class TEMT6000:
 
         Returns
         -------
-        * tuple: (adc_raw_0_4095, percentage_0_100)
+        * tuple: (adc_raw_0_65535, percentage_0_100)
         """
-        ## ADC-Rohwert lesen (0 - 4095)
-        raw_value = self.adc.read()
+        ## ADC-Rohwert lesen (0 - 65535); read_u16() ist die portable API,
+        ## die auf ESP32 wie ESP32-S3 identisch funktioniert (read() ist deprecated)
+        raw_value = self.adc.read_u16()
         ## In Prozent umrechnen
-        percentage = (raw_value / 4095) * 100
+        percentage = (raw_value / 65535) * 100
         return raw_value, percentage
 
 
@@ -50,7 +51,7 @@ if __name__ == "__main__":
         try:
             val, perc = sensor.get_measurement()
             if val is not None:
-                print(f"Helligkeit Rohwert: {val:4d} | Intensität: {perc:5.1f}%")
+                print(f"Helligkeit Rohwert: {val:5d} | Intensität: {perc:5.1f}%")
                 ## Ein kleiner Balken zur Visualisierung
                 bar = "#" * int(perc / 5)
                 print(f"[{bar:20s}]")

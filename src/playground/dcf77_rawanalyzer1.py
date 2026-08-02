@@ -1,10 +1,9 @@
 import asyncio
 import time
 
-import machine  # type: ignore
+import machine
 
-## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
-dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+import boardconfig
 
 
 ##==============================================================================
@@ -60,7 +59,7 @@ class DCFReceiver:
 
 
 ## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
-dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+dcf_pin = boardconfig.get_dcf_pin()
 dcf = DCFReceiver(dcf_pin)
 
 
@@ -84,7 +83,7 @@ async def monitor_dcf() -> None:
             else:
                 print(f"? Störung/Pause: {w}ms")
 
-        await asyncio.sleep_ms(10)  # type: ignore[attr-defined]
+        await asyncio.sleep_ms(10)
 
 
 async def main() -> None:

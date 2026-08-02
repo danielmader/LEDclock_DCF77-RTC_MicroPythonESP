@@ -25,8 +25,8 @@ async def clock_task() -> None:
         ## Berechnen, wie lange wir bis zur nächsten VOLLEN Sekunde warten müssen
         ## Das minimiert das "Wandern" der Anzeige
         current_ms = time.ticks_ms()
-        sleep_time = 1000 - (current_ms % 1000)  # type: ignore[operator]
-        await asyncio.sleep_ms(sleep_time)  # type: ignore[attr-defined]
+        sleep_time = 1000 - (current_ms % 1000)  # type: ignore[operator]  # ty: ignore[unsupported-operator]
+        await asyncio.sleep_ms(sleep_time)
 
 
 ##******************************************************************************

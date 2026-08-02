@@ -1,19 +1,21 @@
 import time
 
-import machine  # type: ignore
+import boardconfig
 
 ## Pin-Setup mit internem Pull-Up (wichtig für Open Collector!)
-dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+dcf_pin = boardconfig.get_dcf_pin()
 
 ## Parameter für die Filterung
 DEBOUNCE_MS = 30  # Ignoriere Pegelwechsel, die kürzer als 30ms sind
 
 print("DCF77 Integrations-Analyzer gestartet...")
 
+## Referenzzeitpunkt für die Ausgabe relativer Zeitstempel
+t0 = time.ticks_ms()
 last_stable_state = dcf_pin.value()
 last_change_time = time.ticks_ms()
-last_pulse_end = None
-pulse_start_time = 0
+last_pulse_end = time.ticks_ms()  # wird erst nach dem ersten Puls verwendet (in_pulse)
+pulse_start_time = time.ticks_ms()
 in_pulse = False
 
 while True:
@@ -35,7 +37,7 @@ while True:
                 if in_pulse:
                     pause_dur = time.ticks_diff(now, last_pulse_end)
                     if pause_dur > 40:  # Rauschen ignorieren
-                         print(f"{time.ticks_ms() / 1000:.3f} - PAUSE: {pause_dur} ms")
+                         print(f"{time.ticks_diff(now, t0) / 1000:.3f} - PAUSE: {pause_dur} ms")
 
             else:  # Übergang zu Pause (Ende des Pulses)
                 pulse_dur = time.ticks_diff(now, pulse_start_time)
@@ -43,7 +45,7 @@ while True:
                 in_pulse = True
                 if pulse_dur > 40:
                     type_str = "Bit 0" if pulse_dur < 150 else "Bit 1"
-                    print(f"{time.ticks_ms() / 1000:.3f} - PULS : {pulse_dur} ms ({type_str})")
+                    print(f"{time.ticks_diff(now, t0) / 1000:.3f} - PULS : {pulse_dur} ms ({type_str})")
 
         ## Wenn der Zustand gerade erst gekippt ist, merken wir uns den Zeitpunkt
         ## aber ändern last_stable_state noch nicht.

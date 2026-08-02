@@ -3,6 +3,9 @@
 
 *.directory
 
+## Generiertes MicroPython-Typeshed für ty (siehe scripts/update-typeshed.sh)
+.typeshed/
+
 ## Large files / non-copyright-free data
 dependencies/
 issues/

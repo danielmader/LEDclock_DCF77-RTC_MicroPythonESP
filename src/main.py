@@ -170,7 +170,7 @@ def _is_sync_jump_acceptable(dcf_now: tuple, rtc_now: "tuple | None") -> bool:
     return delta <= MAX_SYNC_JUMP_SECONDS
 
 
-def _is_dcf_progress_consistent(prev_dcf: tuple, prev_ticks: object, curr_dcf: tuple, curr_ticks: object) -> bool:
+def _is_dcf_progress_consistent(prev_dcf: tuple, prev_ticks, curr_dcf: tuple, curr_ticks) -> bool:
     """Prüft, ob DCF-Zeitfortschritt zur real verstrichenen Zeit passt.
 
     Parameter
@@ -191,7 +191,7 @@ def _is_dcf_progress_consistent(prev_dcf: tuple, prev_ticks: object, curr_dcf: t
         return False
 
     dcf_delta = curr_epoch - prev_epoch
-    elapsed_seconds = time.ticks_diff(curr_ticks, prev_ticks) // 1000  # type: ignore[arg-type]
+    elapsed_seconds = time.ticks_diff(curr_ticks, prev_ticks) // 1000
 
     if dcf_delta <= 0:
         return False
@@ -199,7 +199,7 @@ def _is_dcf_progress_consistent(prev_dcf: tuple, prev_ticks: object, curr_dcf: t
     return abs(dcf_delta - elapsed_seconds) <= DCF_PROGRESS_TOLERANCE_SECONDS
 
 
-def should_accept_dcf_sync(dcf_now: tuple, rtc_now: "tuple | None", recv_ticks: object) -> tuple:
+def should_accept_dcf_sync(dcf_now: tuple, rtc_now: "tuple | None", recv_ticks) -> tuple:
     """Entscheidet, ob eine DCF-Zeit für Synchronisation akzeptiert wird.
 
     Parameter
@@ -275,8 +275,8 @@ async def update_display():
         ## DRIFT-KOMPENSATION
         ## Wir berechnen, wie viele Millisekunden bis zur nächsten vollen Sekunde fehlen.
         ## Das verhindert, dass die Anzeige langsam "wandert".
-        ms_to_next_second = 1000 - (time.ticks_ms() % 1000)  # type: ignore[operator]
-        await asyncio.sleep_ms(ms_to_next_second)  # type: ignore[attr-defined]
+        ms_to_next_second = 1000 - (time.ticks_ms() % 1000)  # type: ignore[operator]  # ty: ignore[unsupported-operator]
+        await asyncio.sleep_ms(ms_to_next_second)
 
 
 async def read_sensors():

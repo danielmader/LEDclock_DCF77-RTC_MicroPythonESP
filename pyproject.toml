@@ -1,4 +1,25 @@
 
+## --- ty (Typechecker, CLI & VSCode-Extension) --------------------------------
+## Das kombinierte MicroPython-Typeshed (.typeshed/) wird von
+## scripts/update-typeshed.sh erzeugt (nach Stub-Updates erneut ausführen).
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.environment]
+python = "./.venv"
+python-version = "3.11"
+typeshed = ".typeshed"
+extra-paths = ["src/lib"]
+
+## Die MicroPython-builtins-Stubs triggern in ty Fehlalarme bei dict.get()
+## mit Default-Wert (funktioniert in Pyright/Pylance einwandfrei).
+[[tool.ty.overrides]]
+include = ["src/max7219wrapper.py"]
+
+[tool.ty.overrides.rules]
+no-matching-overload = "ignore"
+invalid-argument-type = "ignore"
+
 [tool.ruff]
 line-length = 160
 indent-width = 4

@@ -24,8 +24,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from micropython import const
 import framebuf
+import machine
+from micropython import const
 
 _NOOP = const(0)
 _DIGIT0 = const(1)
@@ -36,7 +37,7 @@ _SHUTDOWN = const(12)
 _DISPLAYTEST = const(15)
 
 class Matrix8x8:
-    def __init__(self, spi: object, cs: object, num: int) -> None:
+    def __init__(self, spi: machine.SPI, cs: machine.Pin, num: int) -> None:
         """
         Driver for cascading MAX7219 8x8 LED matrices.
 

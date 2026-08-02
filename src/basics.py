@@ -1,7 +1,7 @@
 import time
 
-import machine  # type: ignore
-import network  # type: ignore
+import machine
+import network
 
 import boardconfig
 
