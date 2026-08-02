@@ -21,6 +21,16 @@ SITE_PACKAGES=.venv/lib/python3.11/site-packages
 rm -rf .typeshed
 mkdir -p .typeshed
 cp -r "$SITE_PACKAGES/stdlib" .typeshed/
-cp "$SITE_PACKAGES/time.pyi" .typeshed/stdlib/
+
+## Einige stdlib-Module (time, _thread, ...) liegen nur als top-level .pyi in
+## den site-packages (für Pyrights stubPath) und fehlen im stdlib/-Verzeichnis.
+## Alle nachtragen, deren Name in der VERSIONS-Liste des Typesheds steht:
+for pyi in "$SITE_PACKAGES"/*.pyi; do
+    name=$(basename "$pyi" .pyi)
+    if grep -q "^${name}: " .typeshed/stdlib/VERSIONS && [ ! -e ".typeshed/stdlib/${name}.pyi" ] && [ ! -d ".typeshed/stdlib/${name}" ]; then
+        cp "$pyi" ".typeshed/stdlib/${name}.pyi"
+        echo "  + stdlib/${name}.pyi (aus top-level Stub ergänzt)"
+    fi
+done
 
 echo ".typeshed aus $SITE_PACKAGES aktualisiert."
