@@ -10,7 +10,7 @@ class DCF77:
     def __init__(
         self,
         dcf_pin: machine.Pin,
-        led_pin: machine.Pin | None = machine.Pin(2, machine.Pin.OUT),
+        led_pin: machine.Pin | None = None,
         debounce_ms: int = 30,
         on_sync = None,
         verbose: bool = False,
@@ -31,7 +31,7 @@ class DCF77:
         """
         ## DCF77-Pin
         self.dcf_pin = dcf_pin
-        ## Interne LED (meist GPIO 2)
+        ## Optionale Status-LED (z.B. interne LED, boardconfig.get_status_led_pin())
         if led_pin is None:
             self.led = None
         else:
@@ -359,7 +359,9 @@ if __name__ == "__main__":
         -------
         * None
         """
-        dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+        import boardconfig
+
+        dcf_pin = boardconfig.get_dcf_pin()
         dcf = DCF77(dcf_pin=dcf_pin, on_sync=handle_sync, verbose=True)
 
         ## Task im Hintergrund starten

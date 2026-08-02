@@ -41,8 +41,10 @@ class TEMT6000:
 ##******************************************************************************
 if __name__ == "__main__":
 
+    import boardconfig
+
     print("Lese TEMT6000 Sensor...")
-    adc_pin = machine.Pin(36)
+    adc_pin = boardconfig.get_adc_pin()
     sensor = TEMT6000(adc_pin)
     while True:
         try:

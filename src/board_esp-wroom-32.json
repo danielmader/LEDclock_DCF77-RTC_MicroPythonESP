@@ -1,0 +1,11 @@
+{
+    "board": "ESP-WROOM-32",
+    "i2c": {"id": 0, "scl": 22, "sda": 23, "freq": 50000},
+    "spi": {"id": 1, "sck": 5, "mosi": 19, "cs": 18, "baudrate": 10000000},
+    "pins": {
+        "temt6000_adc": 36,
+        "dcf77_data": 13,
+        "display_power": null,
+        "status_led": 2
+    }
+}

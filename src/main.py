@@ -3,6 +3,7 @@ import time
 
 import machine
 
+import boardconfig
 import dcf77
 import max7219wrapper
 import rv8263
@@ -10,20 +11,16 @@ import sht31
 import temt6000
 
 ## --- Hardware-Setup ----------------------------------------------------------
+## Die Pinbelegung liegt in board_*.json und wird von boardconfig automatisch
+## anhand des erkannten Boards (ESP-WROOM-32 bzw. ESP32-S3-WROOM-1) geladen.
 
 print("System-Boot: Initialisiere Komponenten...")
 
 ## 1) Interne RTC des ESP32
 rtc_internal = machine.RTC()
 
-## 2) I2C-Bus-Initialisierung mit expliziten Pin-Definitionen für die ESP32-Standard-Pins SCL=22 SDA=23 und Pull-ups.
-## Mit externen 10k-Widerständen kann 'pull=None' gesetzt werden, ansonsten ist der interne Pull-up hilfreich.
-## => Zur Sicherheit interne Pull-ups zusätzlich an.
-sda_pin = machine.Pin(23, machine.Pin.IN, machine.Pin.PULL_UP)
-scl_pin = machine.Pin(22, machine.Pin.IN, machine.Pin.PULL_UP)
-## freq=100000 (100kHz) ist sehr stabil für RTCs
-## => Reduziere auf 50kHz, um Störung des DCF77-Empfangs zu minimieren
-i2c = machine.I2C(0, scl=scl_pin, sda=sda_pin, freq=50000)
+## 2) I2C-Bus-Initialisierung (Pins & Frequenz aus Board-Konfiguration)
+i2c = boardconfig.get_i2c()
 print("Initialisiere I²C Bus...")
 devices = i2c.scan()
 print("Gefundene I²C Adressen:", [hex(d) for d in devices])
@@ -38,13 +35,13 @@ _latest_temp = None
 _latest_hum = None
 
 ## 4) Helligkeitssensor TEMT6000
-adc_pin = machine.Pin(36)
+adc_pin = boardconfig.get_adc_pin()
 light_sensor = temt6000.TEMT6000(adc_pin)
 _latest_lux_perc = None
 
 ## 5) DCF77-Sensor
-dcf_pin = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
-dcf = dcf77.DCF77(dcf_pin, led_pin=None)  # Optional: LED an Pin 2 zur Visualisierung der Signalverarbeitung anschließen
+dcf_pin = boardconfig.get_dcf_pin()
+dcf = dcf77.DCF77(dcf_pin, led_pin=None)  # Optional: Status-LED zur Visualisierung der Signalverarbeitung (boardconfig.get_status_led_pin())
 DCF_MIN_YEAR = 2020
 MAX_SYNC_JUMP_SECONDS = 12 * 60 * 60
 DCF_PROGRESS_TOLERANCE_SECONDS = 20
@@ -52,13 +49,13 @@ _last_dcf_candidate = None
 _last_dcf_candidate_ticks = None
 
 ## 6) MAX7219-LED-Matrix (2x 4 Module à 8x8 LEDs = 2x 32x8)
-baudrate = 500000  # 500 kHz für maximale Stabilität bei langen Kabeln oder vielen Modulen
-baudrate = 1000000  # 1 MHz für flüssigere Darstellung
-baudrate = 10000000  # 10 MHz für maximale Performance (nur bei sehr kurzen Kabeln und wenigen Modulen stabil)
-spi = machine.SPI(1, baudrate=baudrate, polarity=0, phase=0, sck=machine.Pin(5), mosi=machine.Pin(19))
-cs = machine.Pin(18, machine.Pin.OUT)
-# power_pin = machine.Pin(0, machine.Pin.OUT)
-power_pin = None  # wenn kein separater Power-Control-Pin vorhanden ist, auf None setzen
+## Baudrate (Key 'spi.baudrate' in der JSON-Datei):
+## * 500 kHz für maximale Stabilität bei langen Kabeln oder vielen Modulen
+## * 1 MHz für flüssigere Darstellung
+## * 10 MHz für maximale Performance (nur bei sehr kurzen Kabeln und wenigen Modulen stabil)
+spi = boardconfig.get_spi()
+cs = boardconfig.get_spi_cs()
+power_pin = boardconfig.get_display_power_pin()  # None, wenn kein separater Power-Control-Pin vorhanden ist (null in JSON)
 display = max7219wrapper.Max7219Matrix(spi, cs, num_modules=8, power_pin=power_pin, modules_per_row=4)
 
 ## --- Hilfsfunktionen ---------------------------------------------------------

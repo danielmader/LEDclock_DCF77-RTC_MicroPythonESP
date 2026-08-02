@@ -6,21 +6,11 @@ import max7219
 
 from characters import FONT_3X5, FONT_5X7
 
-## SPI Konfiguration
-baudrate = 10000000  # 10 MHz, abhängig von der Verkabelung und Qualität der Verbindung
-baudrate = 1000000  # 1 MHz für stabilere Verbindung bei längeren Kabeln oder mehreren Modulen
-baudrate = 500000  # 500 kHz für maximale Stabilität bei langen Kabeln oder vielen Modulen
-spi = machine.SPI(1, baudrate=baudrate, polarity=0, phase=0, sck=machine.Pin(5), mosi=machine.Pin(19))
-cs = machine.Pin(18, machine.Pin.OUT)
-
 ## 4 Module à 8x8 Pixel = 32 x 8 (BxH)
 # self.display = max7219.Matrix8x8(self.spi, self.cs, self.num_modules)
 # self.display.brightness(self.brightness_level)
 # self.display.fill(0)
 # self.display.show()
-
-## Power-Supply-Schaltung
-power_pin = machine.Pin(0, machine.Pin.OUT)
 
 
 ##==============================================================================
@@ -496,6 +486,13 @@ class Max7219Matrix(max7219.Matrix8x8):
 ##******************************************************************************
 if __name__ == "__main__":
     """Beispiel"""
+    import boardconfig
+
+    ## SPI-Bus, CS- und Power-Pin aus der Board-Konfiguration (board_*.json)
+    spi = boardconfig.get_spi()
+    cs = boardconfig.get_spi_cs()
+    power_pin = boardconfig.get_display_power_pin()
+
     display = Max7219Matrix(spi, cs, num_modules=4, power_pin=power_pin)
 
     ## MAX7219 LED-Matrix Herz-Icon

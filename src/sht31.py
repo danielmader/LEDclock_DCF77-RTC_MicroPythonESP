@@ -76,14 +76,10 @@ class SHT31:
 ##******************************************************************************
 if __name__ == "__main__":
 
-    ## I2C-Bus-Initialisierung mit expliziten Pin-Definitionen für die ESP32-Standard-Pins SCL=22 SDA=23 und Pull-ups.
-    ## Mit externen 10k-Widerständen kann 'pull=None' gesetzt werden, ansonsten ist der interne Pull-up hilfreich.
-    ## => Zur Sicherheit interne Pull-ups zusätzlich an.
-    sda_pin = machine.Pin(23, machine.Pin.IN, machine.Pin.PULL_UP)
-    scl_pin = machine.Pin(22, machine.Pin.IN, machine.Pin.PULL_UP)
-    ## freq=100000 (100kHz) ist sehr stabil für RTCs
-    ## => Reduziere auf 50kHz, um Störung des DCF77-Empfangs zu minimieren
-    i2c = machine.I2C(0, scl=scl_pin, sda=sda_pin, freq=50000)
+    ## I2C-Bus-Initialisierung (Pins & Frequenz aus Board-Konfiguration board_*.json)
+    import boardconfig
+
+    i2c = boardconfig.get_i2c()
 
     print("Lese SHT31 Sensor...")
     sht = SHT31(i2c)

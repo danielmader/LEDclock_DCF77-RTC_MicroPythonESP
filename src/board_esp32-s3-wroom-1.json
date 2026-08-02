@@ -1,0 +1,11 @@
+{
+    "board": "ESP32-S3-WROOM-1",
+    "i2c": {"id": 0, "scl": 9, "sda": 8, "freq": 50000},
+    "spi": {"id": 1, "sck": 1, "mosi": 42, "cs": 2, "baudrate": 10000000},
+    "pins": {
+        "temt6000_adc": 4,
+        "dcf77_data": 14,
+        "display_power": 21,
+        "status_led": null
+    }
+}
